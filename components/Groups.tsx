@@ -1308,6 +1308,7 @@ onRemoveModerator,
   const [loadingEvents, setLoadingEvents] = useState(false);
   const eventsLoadedRef = useRef<boolean>(false);
   const activeGroupIdRef = useRef<number | null>(null);
+  const lastHandledInitialGroupIdRef = useRef<number | null>(null);
   // ✅ REMOVED 'Posts' from the tabs - only 3 tabs now
   const [fbTab, setFbTab] = useState<'Your groups' | 'Discover' | 'Invites'>('Your groups');
   const [sortOpen, setSortOpen] = useState(false);
@@ -1437,17 +1438,26 @@ const pendingUploadTypeRef = useRef<'cover' | 'profile' | null>(null);
   }, [activeGroup, getGroupShareLink]);
 
   // ========== EFFECTS ==========
-useEffect(() => {
-  if (!initialGroupId) return;
-  const gid = parseInt(initialGroupId, 10);
-  if (Number.isNaN(gid)) return;
-  const group = safeGroups.find(g => g.id === gid);
-  if (group) { 
-    setActiveGroupId(group.id); 
+  useEffect(() => {
+    if (!initialGroupId) {
+      lastHandledInitialGroupIdRef.current = null;
+      return;
+    }
+    const gid = parseInt(String(initialGroupId), 10);
+    if (Number.isNaN(gid)) return;
+    if (lastHandledInitialGroupIdRef.current === gid) return;
+    lastHandledInitialGroupIdRef.current = gid;
+
+    setActiveGroupId(gid); 
     setView('detail'); 
     setGroupTab('Discussion'); 
+
+    const group = safeGroups.find(g => g.id === gid);
+    if (group) { 
+      setActiveGroupDetails(normalizeGroup(group)); 
+    }
     if (fetchGroupDetails) { 
-      fetchGroupDetails(group.id) 
+      fetchGroupDetails(gid) 
         .then((details) => { 
           if (details?.group) setActiveGroupDetails(normalizeGroup(details.group)); 
         }) 
@@ -1455,8 +1465,7 @@ useEffect(() => {
           console.error('Failed to fetch initial group details:', error); 
         }); 
     } 
-  }
-}, [initialGroupId, safeGroups, fetchGroupDetails]);
+  }, [initialGroupId, safeGroups, fetchGroupDetails]);
 
 
   useEffect(() => { activeGroupIdRef.current = activeGroupId; }, [activeGroupId]);

@@ -215,7 +215,7 @@ interface UserProfileProps {
   getCommentAuthor?: (id: number) => User | undefined;
   onViewImage: (url: string) => void;
   onCreateEventClick?: () => void;
-  onOpenComments: (postId: number) => void;
+  onOpenComments: (postOrId: any) => void;
   onVideoClick: (post: PostType) => void;
   onPlayAudioTrack?: (track: AudioTrack) => void;
 
@@ -928,21 +928,28 @@ export const UserProfile: React.FC<UserProfileProps> = ({
   };
 
   // ========== OPEN COMMENTS SHEET WITH REFRESH FUNCTION ==========
-  const handleOpenComments = (postId: number) => {
-    const post = profilePosts.find(p => safePostIdHelper(p) === postId);
-    if (post) {
-      console.log('📝 Opening comments for post:', postId);
-      
+  const handleOpenComments = (postOrId: any) => {
+    let targetPost: PostType | undefined;
+    if (postOrId && typeof postOrId === 'object' && postOrId.id) {
+      targetPost = postOrId;
+    } else {
+      const id = Number(postOrId);
+      targetPost = profilePosts.find(p => safePostIdHelper(p) === id) || posts.find(p => safePostIdHelper(p) === id);
+    }
+
+    if (onOpenComments) {
+      onOpenComments(targetPost || postOrId);
+      return;
+    }
+
+    if (targetPost) {
       setSelectedPostForComments({
-        ...post,
+        ...targetPost,
         onCommentAdded: () => {
-          console.log('🔄 Comment added, refreshing post:', postId);
-          refreshPost(postId);
+          refreshPost(safePostIdHelper(targetPost));
         }
       });
       setShowCommentsSheet(true);
-    } else {
-      onOpenComments(postId);
     }
   };
 

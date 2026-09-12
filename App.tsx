@@ -5550,10 +5550,56 @@ const createMarketplacePost = useCallback(
   }, [requireAuth, currentUser]);
 
   const openProfile = useCallback((id: number) => {
-    setSelectedUserId(Number(id));
+    const numId = Number(id);
+    if (!numId) return;
+    setSelectedUserId(numId);
+    
+    // Check if user is in users list; if in PYMK suggestions, pre-seed immediately
+    const existsInUsers = users.some(u => Number(u.id) === numId);
+    if (!existsInUsers) {
+      const pymk = peopleYouMayKnow.find(u => Number(u.id) === numId);
+      if (pymk) {
+        const seededUser: User = {
+          id: pymk.id,
+          name: pymk.name,
+          username: pymk.username,
+          profile_image_url: pymk.profile_image_url,
+          is_verified: pymk.is_verified,
+          role: (pymk.role as any) || 'user',
+          bio: '',
+          work: '',
+          location: '',
+          education: '',
+          website: '',
+          followers: [],
+          following: [],
+          is_online: false,
+        };
+        setUsers(prev => {
+          const map = new Map<number, User>();
+          prev.forEach(u => map.set(Number(u.id), u));
+          map.set(Number(seededUser.id), seededUser);
+          return Array.from(map.values());
+        });
+      }
+
+      // Also fetch full user details from API
+      apiFetch(`/api/users?id=${numId}`).then((fresh) => {
+        if (fresh && fresh.id) {
+          const normalized = normalizeUser(fresh);
+          setUsers(prev => {
+            const map = new Map<number, User>();
+            prev.forEach(u => map.set(Number(u.id), u));
+            map.set(Number(normalized.id), normalized);
+            return Array.from(map.values());
+          });
+        }
+      }).catch(() => {});
+    }
+
     navigateTo('profile');
     window.scrollTo(0, 0);
-  }, [navigateTo]);
+  }, [navigateTo, users, peopleYouMayKnow]);
 
   const handleOpenChat = useCallback((recipient: User) => {
     if (!requireAuth('Messaging')) return;
@@ -8193,10 +8239,31 @@ useEffect(() => {
   
   const profileUser = useMemo(() => {
     if (selectedUserId) {
-      return users.find((u) => Number(u.id) === Number(selectedUserId)) || null;
+      const foundInUsers = users.find((u) => Number(u.id) === Number(selectedUserId));
+      if (foundInUsers) return foundInUsers;
+      const foundInPymk = peopleYouMayKnow.find((u) => Number(u.id) === Number(selectedUserId));
+      if (foundInPymk) {
+        return {
+          id: foundInPymk.id,
+          name: foundInPymk.name,
+          username: foundInPymk.username,
+          profile_image_url: foundInPymk.profile_image_url,
+          is_verified: foundInPymk.is_verified,
+          role: (foundInPymk.role as any) || 'user',
+          bio: '',
+          work: '',
+          location: '',
+          education: '',
+          website: '',
+          followers: [],
+          following: [],
+          is_online: false,
+        } as User;
+      }
+      return null;
     }
     return currentUser || null;
-  }, [selectedUserId, users, currentUser]);
+  }, [selectedUserId, users, currentUser, peopleYouMayKnow]);
 
   const handleRegister = useCallback(async (userData: any) => {
     try {
@@ -8468,6 +8535,10 @@ useEffect(() => {
       }
       openProfile(currentUser.id);
       return;
+    }
+
+    if (target === 'groups') {
+      setActiveGroupId(null);
     }
 
     navigateTo(target);
@@ -9764,6 +9835,17 @@ const openProduct = useCallback((productId: string | number) => {
   }
 }, [products, navigateTo]);
 
+const openGroup = useCallback((groupId: string | number) => {
+  const gid = Number(groupId);
+  if (!gid) {
+    setActiveGroupId(null);
+    navigateTo('groups');
+    return;
+  }
+  setActiveGroupId(gid);
+  navigateTo('groups');
+}, [navigateTo]);
+
 const openGroupPost = useCallback((postId: string | number) => {
   // Navigate to groups and highlight the specific post
   navigateTo('groups');
@@ -9955,8 +10037,7 @@ const markAllNotificationsAsRead = useCallback(async () => {
   // Handle GROUP (join/invite)
   if (targetType === "group" && targetId) {
     markAsRead();
-    navigateTo('groups');
-    // Optionally highlight the specific group
+    openGroup(targetId);
     return;
   }
 
@@ -10232,7 +10313,7 @@ return (
   onJoinGroupSuggestion={joinFromSuggestion}
   gymjLoading={gymjLoading}
 
-  onOpenGroup={(groupId) => navigateTo("groups")}
+  onOpenGroup={(groupId) => openGroup(groupId)}
 
   // =========================
   // Login
@@ -10339,7 +10420,7 @@ feedLoadingMore={feedLoadingMore}
               onMakeModerator={makeModerator}
   
               onDeclineGroupInvite={declineGroupInvite}
-              initialGroupId={null}
+              initialGroupId={activeGroupId ? String(activeGroupId) : null}
               onApplyToJob={async (postId: number, applicationData?: any) => {
                 console.log('Apply to job:', postId, applicationData);
               }}
@@ -10550,53 +10631,68 @@ feedLoadingMore={feedLoadingMore}
         {view === 'terms' && <TermsOfServicePage onNavigateHome={() => setView('home')} />}
         {view === 'help' && <HelpSupportPage onNavigateHome={() => setView('home')} />}
 
-        {view === 'profile' && profileUser && (
-          <UserProfile
-            user={profileUser}
-            currentUser={currentUser}
-            users={users}
-            posts={profilePosts}
-            reels={reels}
-            onProfileClick={(id) => openProfile(id)}
-            onFollow={(id: number) => followUser(id)}
-            onReact={(postId: number, type: ReactionType) => onReactPost(postId, type)}
-            onComment={() => requireAuth('Commenting')}
-            onShare={(post: any) => handleOpenShareSheet(post)}
-            onMessage={(id) => {
-              if (!requireAuth('Messaging')) return;
-              const recipient = users.find((u) => u.id === id);
-              if (recipient) {
-                handleOpenChat(recipient);
-              }
-            }}
-            onCreatePost={createPost as any}
-            onUpdateProfileImage={updateProfileImage as any}
-            onUpdateCoverImage={updateCoverImage as any}
-            onUpdateUserDetails={updateUserDetails as any}
-            onDeletePost={(postId: number) => deletePost(postId)}
-            onEditPost={(postId: number, content: string) => editPost(postId, content)}
-            getCommentAuthor={(id) => users.find((u) => u.id === id)}
-            onViewImage={setFullScreenImage}
-            onOpenComments={(postId) => {
-              const post = posts.find(p => p.id === postId) || profilePosts.find(p => p.id === postId);
-              if (post) handleOpenComments(post);
-            }}
-            onVideoClick={handleVideoClick}
-            onPlayAudioTrack={onPlayTrack}
-            onCreateStoryClick={handleCreateStoryFromProfile}
-            onVerifyUser={(id) => verifyUser(id)}
-            onRestrictUser={(id, duration) => suspendUser(id, duration)}
-            onDeleteUser={(id) => deleteUserAccount(id)}
-            onMakeModerator={(id, make) => setModeratorRole(id, make ? 'moderator' : 'user')}
-            isFollowing={checkIsFollowing(Number(profileUser.id))}
-            followLoading={followLoading[Number(profileUser.id)] || false}
-            onOpenChat={handleOpenChat}
-            isChatOpen={isChatOpen}
-            activeChatRecipient={activeChatUser}
-            onOpenChatsList={handleOpenChatsList}
-            isChatsListOpen={isChatsListOpen}
-            onBack={goBack}
-          />
+        {view === 'profile' && (
+          profileUser ? (
+            <UserProfile
+              user={profileUser}
+              currentUser={currentUser}
+              users={users}
+              posts={profilePosts}
+              reels={reels}
+              onProfileClick={(id) => openProfile(id)}
+              onFollow={(id: number) => followUser(id)}
+              onReact={(postId: number, type: ReactionType) => onReactPost(postId, type)}
+              onComment={() => requireAuth('Commenting')}
+              onShare={(post: any) => handleOpenShareSheet(post)}
+              onMessage={(id) => {
+                if (!requireAuth('Messaging')) return;
+                const recipient = users.find((u) => u.id === id);
+                if (recipient) {
+                  handleOpenChat(recipient);
+                }
+              }}
+              onCreatePost={createPost as any}
+              onUpdateProfileImage={updateProfileImage as any}
+              onUpdateCoverImage={updateCoverImage as any}
+              onUpdateUserDetails={updateUserDetails as any}
+              onDeletePost={(postId: number) => deletePost(postId)}
+              onEditPost={(postId: number, content: string) => editPost(postId, content)}
+              getCommentAuthor={(id) => users.find((u) => u.id === id)}
+              onViewImage={setFullScreenImage}
+              onOpenComments={(postOrId: any) => {
+                let targetPost: PostType | undefined;
+                if (postOrId && typeof postOrId === 'object' && postOrId.id) {
+                  targetPost = postOrId;
+                } else {
+                  const id = Number(postOrId);
+                  targetPost = posts.find(p => Number(p.id) === id) || profilePosts.find(p => Number(p.id) === id);
+                }
+                if (targetPost) {
+                  handleOpenComments(targetPost);
+                }
+              }}
+              onVideoClick={handleVideoClick}
+              onPlayAudioTrack={onPlayTrack}
+              onCreateStoryClick={handleCreateStoryFromProfile}
+              onVerifyUser={(id) => verifyUser(id)}
+              onRestrictUser={(id, duration) => suspendUser(id, duration)}
+              onDeleteUser={(id) => deleteUserAccount(id)}
+              onMakeModerator={(id, make) => setModeratorRole(id, make ? 'moderator' : 'user')}
+              isFollowing={checkIsFollowing(Number(profileUser.id))}
+              followLoading={followLoading[Number(profileUser.id)] || false}
+              onOpenChat={handleOpenChat}
+              isChatOpen={isChatOpen}
+              activeChatRecipient={activeChatUser}
+              onOpenChatsList={handleOpenChatsList}
+              isChatsListOpen={isChatsListOpen}
+              onBack={goBack}
+            />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center py-24 text-center">
+              <div className="w-10 h-10 border-4 border-[#1877F2] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-[#94A3B8] font-medium text-base">Loading profile...</p>
+            </div>
+          )
         )}
 
         {view === 'login' && (

@@ -2845,7 +2845,7 @@ const FeedStoryCard: React.FC<FeedStoryCardProps> = ({ story, onOpen }) => {
             </div>
           </div>
         ) : isVideo ? (
-          <div className="relative h-[420px] bg-black">
+          <div className="relative h-[420px] bg-[#0B1120]">
             {thumbnailUrl ? (
               <img
                 src={thumbnailUrl}
@@ -2862,7 +2862,7 @@ const FeedStoryCard: React.FC<FeedStoryCardProps> = ({ story, onOpen }) => {
                 preload="metadata"
               />
             ) : (
-              <div className="w-full h-full bg-[#111]" />
+              <div className="w-full h-full bg-[#0B1120]" />
             )}
 
             <div className="absolute inset-0 bg-black/10" />
@@ -2873,7 +2873,7 @@ const FeedStoryCard: React.FC<FeedStoryCardProps> = ({ story, onOpen }) => {
             </div>
           </div>
         ) : isImage ? (
-          <div className="relative h-[420px] bg-black">
+          <div className="relative h-[420px] bg-[#0B1120]">
             {primaryMedia ? (
               <ProgressiveTileImage
                 item={{
@@ -2892,7 +2892,7 @@ const FeedStoryCard: React.FC<FeedStoryCardProps> = ({ story, onOpen }) => {
                 loading="lazy"
               />
             ) : (
-              <div className="w-full h-full bg-[#111]" />
+              <div className="w-full h-full bg-[#0B1120]" />
             )}
           </div>
         ) : null}

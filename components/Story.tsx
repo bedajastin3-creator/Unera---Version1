@@ -1884,28 +1884,20 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
   const displayMediaUrl = getDisplayMediaUrl(story);
 
   return (
-    <div className="fixed inset-0 z-[250] bg-[#050B18] animate-fade-in">
-      <div
-        className="absolute inset-0 opacity-30 bg-cover bg-center blur-3xl"
-        style={{
-          backgroundImage: displayMediaUrl ? `url(${displayMediaUrl})` : undefined,
-          background: !displayMediaUrl ? (story as any).background_style : undefined,
-        }}
-      />
-
+    <div className="fixed inset-0 z-[250] bg-[#050B18] animate-fade-in flex items-center justify-center">
       <button
-        className="absolute top-4 right-4 z-[300] cursor-pointer w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
+        className="absolute top-4 right-4 z-[300] cursor-pointer w-10 h-10 flex items-center justify-center bg-[#0F172A]/80 hover:bg-[#1E293B] border border-[#1E293B] rounded-full transition-colors"
         onClick={(e) => {
           e.stopPropagation();
           onClose();
         }}
         aria-label="Close story viewer"
       >
-        <i className="fas fa-times text-[#E4E6EB] text-2xl"></i>
+        <i className="fas fa-times text-[#F8FAFC] text-xl"></i>
       </button>
 
       <div
-        className="relative w-full h-full bg-[#050B18] overflow-hidden flex flex-col touch-none"
+        className="relative w-full h-full max-w-[480px] bg-[#0B1120] sm:rounded-2xl sm:border sm:border-[#1E293B] sm:shadow-2xl overflow-hidden flex flex-col touch-none"
         style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -1957,7 +1949,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
         </div>
 
         <div 
-          className="absolute top-4 left-0 right-0 p-4 z-30 flex items-center justify-between mt-2" 
+          className="absolute top-0 left-0 right-0 p-4 pt-6 z-30 flex items-center justify-between bg-gradient-to-b from-[#0B1120]/90 via-[#0B1120]/40 to-transparent" 
           data-no-nav="true"
         >
           <div className="flex items-center gap-3">
@@ -2075,7 +2067,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
           </div>
         </div>
 
-        <div className="flex-1 bg-[#050B18] relative">
+        <div className="flex-1 bg-[#0B1120] relative">
           <div
             className="absolute inset-0 z-[5]"
             onDoubleClick={isAuthor ? undefined : () => handleReaction('like')}
@@ -2085,7 +2077,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
             {storyIsText ? (
               <div
                 className="w-full h-full flex items-center justify-center p-10 text-center"
-                style={{ background: (story as any).background_style }}
+                style={{ background: (story as any).background_style || '#0B1120' }}
               >
                 <span className="text-white font-bold text-4xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] whitespace-pre-wrap">
                   {(story as any).text_content}
@@ -2125,15 +2117,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
                   }}
                 />
               ) : (
-                <div className="absolute inset-0 z-10">
-                  <div
-                    className="absolute inset-0 blur-3xl scale-110 opacity-40"
-                    style={{
-                      backgroundImage: `url(${displayMediaUrl})`,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                    }}
-                  />
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0B1120]">
                   <img
                     src={displayMediaUrl}
                     alt="Story"
@@ -2147,7 +2131,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
               )
             ) : (
               <div 
-                className="w-full h-full flex items-center justify-center p-10 text-center bg-gradient-to-br from-purple-600 to-blue-500 z-10"
+                className="w-full h-full flex items-center justify-center p-10 text-center bg-[#0B1120] z-10"
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsPaused(p => !p);
@@ -2196,7 +2180,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
 
         {/* Horizontal Bottom Actions - React, Discuss, Share */}
         <div 
-          className="absolute bottom-0 left-0 right-0 p-3 z-20 bg-gradient-to-t from-[#050B18]/95 via-[#050B18]/60 to-transparent pt-10"
+          className="absolute bottom-0 left-0 right-0 p-3 z-20 bg-gradient-to-t from-[#0B1120] via-[#0B1120]/80 to-transparent pt-10"
           data-no-nav="true"
         >
           {/* Reaction row with counts */}
