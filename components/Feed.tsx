@@ -2247,15 +2247,22 @@ export const PeopleYouMayKnowGrid = memo(
         <div className="w-full">
           <div className="bg-[#0B1120] w-full p-4">
             <div className="flex justify-between items-center mb-3">
-              <h3 className="text-[#F8FAFC] font-bold text-[20px]">{title}</h3>
+              <h3 className="text-[#F8FAFC] font-bold text-[18px] sm:text-[20px] tracking-tight">{title}</h3>
             </div>
-            <div className="flex gap-4 overflow-x-hidden py-2">
+            <div className="flex gap-3 overflow-x-hidden py-1">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex-shrink-0 w-[180px] animate-pulse">
-                  <div className="w-24 h-24 mx-auto mb-3 bg-[#1E293B] rounded-full"></div>
-                  <div className="h-5 bg-[#1E293B] rounded w-32 mx-auto mb-2"></div>
-                  <div className="h-4 bg-[#1E293B] rounded w-20 mx-auto mb-4"></div>
-                  <div className="h-10 bg-[#1E293B] rounded-lg w-full"></div>
+                <div
+                  key={i}
+                  className="flex-shrink-0 w-[168px] sm:w-[185px] bg-[#1E293B] rounded-2xl overflow-hidden animate-pulse border border-[#334155]/30 flex flex-col"
+                >
+                  <div className="aspect-square w-full bg-[#334155]/60" />
+                  <div className="p-3 flex flex-col flex-1 justify-between">
+                    <div>
+                      <div className="h-4 bg-[#334155]/70 rounded w-3/4 mb-2" />
+                      <div className="h-3 bg-[#334155]/40 rounded w-1/2 mb-3" />
+                    </div>
+                    <div className="h-9 bg-[#334155]/60 rounded-lg w-full" />
+                  </div>
                 </div>
               ))}
             </div>
@@ -2271,22 +2278,26 @@ export const PeopleYouMayKnowGrid = memo(
       <div className="w-full">
         <div className="bg-[#0B1120] w-full p-4">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-[#F8FAFC] font-bold text-[20px]">{title}</h3>
-            <div className="flex items-center gap-2">
+            <h3 className="text-[#F8FAFC] font-bold text-[18px] sm:text-[20px] tracking-tight">{title}</h3>
+            <div className="flex items-center gap-1.5">
               {canScrollLeft && (
                 <button
+                  type="button"
                   onClick={() => scroll('left')}
-                  className="w-9 h-9 rounded-full bg-[#1E293B] hover:bg-[#334155] flex items-center justify-center transition-colors"
+                  aria-label="Scroll left"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#1E293B] hover:bg-[#334155] border border-[#334155]/50 flex items-center justify-center transition-colors active:scale-95"
                 >
-                  <i className="fas fa-chevron-left text-[#F8FAFC] text-base"></i>
+                  <i className="fas fa-chevron-left text-[#F8FAFC] text-sm"></i>
                 </button>
               )}
               {canScrollRight && (
                 <button
+                  type="button"
                   onClick={() => scroll('right')}
-                  className="w-9 h-9 rounded-full bg-[#1E293B] hover:bg-[#334155] flex items-center justify-center transition-colors"
+                  aria-label="Scroll right"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#1E293B] hover:bg-[#334155] border border-[#334155]/50 flex items-center justify-center transition-colors active:scale-95"
                 >
-                  <i className="fas fa-chevron-right text-[#F8FAFC] text-base"></i>
+                  <i className="fas fa-chevron-right text-[#F8FAFC] text-sm"></i>
                 </button>
               )}
             </div>
@@ -2294,96 +2305,112 @@ export const PeopleYouMayKnowGrid = memo(
 
           <div
             ref={scrollRef}
-            className="flex gap-4 overflow-x-auto scrollbar-hide pb-1"
+            className="flex gap-3 overflow-x-auto scrollbar-hide pb-1"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {displayUsers.map((user) => (
               <div
                 key={user.id}
-                className="flex-shrink-0 w-[180px] bg-[#1E293B] rounded-xl p-4 hover:bg-[#334155] transition-colors group"
+                className="flex-shrink-0 w-[168px] sm:w-[185px] bg-[#1E293B] rounded-2xl overflow-hidden border border-[#334155]/40 hover:border-[#FF6B00]/40 transition-all duration-200 shadow-lg flex flex-col group"
               >
+                {/* 1. Large Square Profile Photo */}
                 <div
-                  className="relative w-24 h-24 mx-auto mb-3 cursor-pointer"
+                  className="aspect-square w-full relative bg-[#0F172A] overflow-hidden cursor-pointer shrink-0"
                   onClick={() => handleProfileClick(user.id)}
                 >
-                  <div className="w-full h-full rounded-full overflow-hidden border-3 border-[#1877F2] group-hover:border-[#166FE5] transition-colors">
-                    <img
-                      src={
-                        user.profile_image_url ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          user.name
-                        )}&background=1877F2&color=fff&bold=true&size=128`
-                      }
-                      alt={user.name}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      onError={(e) => {
-                        const target = e.currentTarget;
-                        target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          user.name
-                        )}&background=1877F2&color=fff&bold=true&size=128`;
-                      }}
-                    />
-                  </div>
-                  {user.is_verified && (
-                    <i className="fas fa-check-circle absolute bottom-1 right-1 text-[#1877F2] text-base bg-[#0B1120] rounded-full p-0.5 border border-[#1E293B]"></i>
-                  )}
+                  <img
+                    src={
+                      user.profile_image_url ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        user.name
+                      )}&background=FF6B00&color=fff&bold=true&size=320`
+                    }
+                    alt={user.name}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    loading="lazy"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                        user.name
+                      )}&background=FF6B00&color=fff&bold=true&size=320`;
+                    }}
+                  />
                 </div>
 
-                <div className="text-center mb-2">
-                  <button
-                    type="button"
-                    onClick={() => handleProfileClick(user.id)}
-                    className="text-[#F8FAFC] font-bold text-[17px] truncate block w-full hover:underline"
-                  >
-                    {user.name}
-                  </button>
-                  {user.role && (
-                    <div className="text-[#94A3B8] text-[13px] mt-1">{user.role}</div>
-                  )}
-                </div>
-
-                {user.mutual_count > 0 && (
-                  <div className="text-center mb-3">
-                    <span className="text-[#94A3B8] text-[13px]">
-                      {user.mutual_count} mutual friend
-                      {user.mutual_count !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                )}
-
-                {!currentUser ? (
-                  <button
-                    onClick={onLoginClick}
-                    className="w-full py-2.5 bg-[#1877F2] hover:bg-[#166FE5] text-white text-[15px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1"
-                  >
-                    <i className="fas fa-sign-in-alt text-[13px]"></i>
-                    <span>Sign in</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleFollow(user.id)}
-                    disabled={followLoading[user.id]}
-                    className={`w-full py-2.5 text-[15px] font-bold rounded-lg transition-all duration-200 flex items-center justify-center gap-1 ${
-                      user.is_following
-                        ? 'bg-[#1E293B] text-[#F8FAFC] hover:bg-[#334155]'
-                        : 'bg-[#1877F2] text-white hover:bg-[#166FE5]'
-                    } disabled:opacity-70 disabled:cursor-not-allowed`}
-                  >
-                    {followLoading[user.id] ? (
-                      <i className="fas fa-spinner fa-spin text-[13px]"></i>
-                    ) : (
-                      <>
+                {/* Card Information Section */}
+                <div className="p-3 flex flex-col flex-1 justify-between bg-[#1E293B]">
+                  <div>
+                    {/* 2. Person's Name */}
+                    <div className="flex items-center gap-1 min-w-0 mb-1">
+                      <button
+                        type="button"
+                        onClick={() => handleProfileClick(user.id)}
+                        className="text-[#F8FAFC] font-bold text-[15px] sm:text-[16px] leading-snug truncate text-left hover:underline block w-full"
+                        title={user.name}
+                      >
+                        {user.name}
+                      </button>
+                      {user.is_verified && (
                         <i
-                          className={`fas ${
-                            user.is_following ? 'fa-check' : 'fa-user-plus'
-                          } text-[13px]`}
-                        ></i>
-                        <span>{user.is_following ? 'Following' : 'Follow'}</span>
-                      </>
-                    )}
-                  </button>
-                )}
+                          className="fas fa-check-circle text-[#FF6B00] text-[13px] shrink-0"
+                          title="Verified"
+                        />
+                      )}
+                    </div>
+
+                    {/* 3. Mutual Friends */}
+                    <div className="flex items-center gap-1.5 text-[#94A3B8] text-[12px] sm:text-[13px] mb-3 min-h-[18px]">
+                      {user.mutual_count > 0 ? (
+                        <>
+                          <i className="fas fa-user-group text-[11px] opacity-75 shrink-0" />
+                          <span className="truncate">
+                            {user.mutual_count} mutual friend{user.mutual_count !== 1 ? 's' : ''}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="truncate opacity-75">
+                          {user.role || 'Suggested for you'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 4. Follow Button */}
+                  {!currentUser ? (
+                    <button
+                      type="button"
+                      onClick={onLoginClick}
+                      className="w-full py-2 sm:py-2.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white text-[13px] sm:text-[14px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm shadow-[#FF6B00]/20 active:scale-[0.98]"
+                    >
+                      <i className="fas fa-user-plus text-[12px] sm:text-[13px]"></i>
+                      <span>Follow</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleFollow(user.id)}
+                      disabled={followLoading[user.id]}
+                      className={`w-full py-2 sm:py-2.5 text-[13px] sm:text-[14px] font-bold rounded-lg transition-all duration-150 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
+                        user.is_following
+                          ? 'bg-[#334155] text-[#F8FAFC] hover:bg-[#475569]'
+                          : 'bg-[#FF6B00] text-white hover:bg-[#E05E00] shadow-sm shadow-[#FF6B00]/20'
+                      } disabled:opacity-70 disabled:cursor-not-allowed`}
+                    >
+                      {followLoading[user.id] ? (
+                        <i className="fas fa-spinner fa-spin text-[13px]"></i>
+                      ) : (
+                        <>
+                          <i
+                            className={`fas ${
+                              user.is_following ? 'fa-check' : 'fa-user-plus'
+                            } text-[12px] sm:text-[13px]`}
+                          ></i>
+                          <span>{user.is_following ? 'Following' : 'Follow'}</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
