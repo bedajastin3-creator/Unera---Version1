@@ -2311,7 +2311,7 @@ export const PeopleYouMayKnowGrid = memo(
             {displayUsers.map((user) => (
               <div
                 key={user.id}
-                className="flex-shrink-0 w-[168px] sm:w-[185px] bg-[#1E293B] rounded-2xl overflow-hidden border border-[#334155]/40 hover:border-[#FF6B00]/40 transition-all duration-200 shadow-lg flex flex-col group"
+                className="flex-shrink-0 w-[168px] sm:w-[185px] bg-[#1E293B] rounded-2xl overflow-hidden border border-[#334155]/40 hover:border-[#1877F2]/50 transition-all duration-200 shadow-lg flex flex-col group"
               >
                 {/* 1. Large Square Profile Photo */}
                 <div
@@ -2323,7 +2323,7 @@ export const PeopleYouMayKnowGrid = memo(
                       user.profile_image_url ||
                       `https://ui-avatars.com/api/?name=${encodeURIComponent(
                         user.name
-                      )}&background=FF6B00&color=fff&bold=true&size=320`
+                      )}&background=1877F2&color=fff&bold=true&size=320`
                     }
                     alt={user.name}
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -2332,7 +2332,7 @@ export const PeopleYouMayKnowGrid = memo(
                       const target = e.currentTarget;
                       target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
                         user.name
-                      )}&background=FF6B00&color=fff&bold=true&size=320`;
+                      )}&background=1877F2&color=fff&bold=true&size=320`;
                     }}
                   />
                 </div>
@@ -2340,22 +2340,24 @@ export const PeopleYouMayKnowGrid = memo(
                 {/* Card Information Section */}
                 <div className="p-3 flex flex-col flex-1 justify-between bg-[#1E293B]">
                   <div>
-                    {/* 2. Person's Name */}
-                    <div className="flex items-center gap-1 min-w-0 mb-1">
+                    {/* 2. Person's Name & Extended Verification Badge */}
+                    <div className="flex items-center min-w-0 mb-1">
                       <button
                         type="button"
                         onClick={() => handleProfileClick(user.id)}
-                        className="text-[#F8FAFC] font-bold text-[15px] sm:text-[16px] leading-snug truncate text-left hover:underline block w-full"
+                        className="text-[#F8FAFC] font-bold text-[15px] sm:text-[16px] leading-snug truncate text-left hover:underline inline-flex items-center gap-1.5 max-w-full"
                         title={user.name}
                       >
-                        {user.name}
+                        <span className="truncate">{user.name}</span>
+                        {user.is_verified && (
+                          <span
+                            title="Verified"
+                            className="inline-flex items-center justify-center text-[#1877F2] shrink-0"
+                          >
+                            <i className="fas fa-check-circle text-[14px]" />
+                          </span>
+                        )}
                       </button>
-                      {user.is_verified && (
-                        <i
-                          className="fas fa-check-circle text-[#FF6B00] text-[13px] shrink-0"
-                          title="Verified"
-                        />
-                      )}
                     </div>
 
                     {/* 3. Mutual Friends */}
@@ -2380,7 +2382,7 @@ export const PeopleYouMayKnowGrid = memo(
                     <button
                       type="button"
                       onClick={onLoginClick}
-                      className="w-full py-2 sm:py-2.5 bg-[#FF6B00] hover:bg-[#E05E00] text-white text-[13px] sm:text-[14px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm shadow-[#FF6B00]/20 active:scale-[0.98]"
+                      className="w-full py-2 sm:py-2.5 bg-[#1877F2] hover:bg-[#166FE5] text-white text-[13px] sm:text-[14px] font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm shadow-[#1877F2]/20 active:scale-[0.98]"
                     >
                       <i className="fas fa-user-plus text-[12px] sm:text-[13px]"></i>
                       <span>Follow</span>
@@ -2393,7 +2395,7 @@ export const PeopleYouMayKnowGrid = memo(
                       className={`w-full py-2 sm:py-2.5 text-[13px] sm:text-[14px] font-bold rounded-lg transition-all duration-150 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
                         user.is_following
                           ? 'bg-[#334155] text-[#F8FAFC] hover:bg-[#475569]'
-                          : 'bg-[#FF6B00] text-white hover:bg-[#E05E00] shadow-sm shadow-[#FF6B00]/20'
+                          : 'bg-[#1877F2] text-white hover:bg-[#166FE5] shadow-sm shadow-[#1877F2]/20'
                       } disabled:opacity-70 disabled:cursor-not-allowed`}
                     >
                       {followLoading[user.id] ? (
@@ -7746,26 +7748,71 @@ export const CommentsSheet = memo(
   // Build comment threads
   const idKey = (v: any) => String(v ?? '').trim();
 
-  const buildThreads = (list: any[]) => {
-    const roots = list.filter((c) => !c.parent_comment_id);
+  // Helper: find root comment ID for any nested reply or replyer
+  const findRootCommentId = (c: any, list: any[]): string => {
+    if (!c || !c.parent_comment_id) return idKey(c?.id);
+    const commentMap = new Map<string, any>();
+    list.forEach((item) => commentMap.set(idKey(item.id), item));
 
-    const repliesByParent = new Map<string, any[]>();
+    let curr = c;
+    const visited = new Set<string>();
+    while (curr && curr.parent_comment_id && !visited.has(idKey(curr.id))) {
+      visited.add(idKey(curr.id));
+      const parent = commentMap.get(idKey(curr.parent_comment_id));
+      if (parent) {
+        curr = parent;
+      } else {
+        return idKey(curr.parent_comment_id);
+      }
+    }
+    return idKey(curr?.id);
+  };
+
+  const buildThreads = (list: any[]) => {
+    const commentMap = new Map<string, any>();
+    list.forEach((c) => commentMap.set(idKey(c.id), c));
+
+    const findRootId = (c: any): string => {
+      let curr = c;
+      const visited = new Set<string>();
+      while (curr && curr.parent_comment_id && !visited.has(idKey(curr.id))) {
+        visited.add(idKey(curr.id));
+        const parent = commentMap.get(idKey(curr.parent_comment_id));
+        if (parent) {
+          curr = parent;
+        } else {
+          return idKey(curr.parent_comment_id);
+        }
+      }
+      return idKey(curr?.id);
+    };
+
+    const roots: any[] = [];
+    const repliesByRoot = new Map<string, any[]>();
 
     list.forEach((c) => {
-      const pid = idKey(c.parent_comment_id);
-      if (!pid) return;
-
-      if (!repliesByParent.has(pid)) repliesByParent.set(pid, []);
-      repliesByParent.get(pid)!.push(c);
+      if (!c.parent_comment_id) {
+        roots.push(c);
+      } else {
+        const rootId = findRootId(c);
+        if (!repliesByRoot.has(rootId)) {
+          repliesByRoot.set(rootId, []);
+        }
+        repliesByRoot.get(rootId)!.push(c);
+      }
     });
 
-    repliesByParent.forEach((arr) => {
-      arr.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    repliesByRoot.forEach((arr) => {
+      arr.sort((a, b) => {
+        const timeA = new Date(a.created_at || a.createdAt || a.timestamp || 0).getTime();
+        const timeB = new Date(b.created_at || b.createdAt || b.timestamp || 0).getTime();
+        return timeA - timeB;
+      });
     });
 
     return roots.map((root) => ({
       root,
-      replies: repliesByParent.get(idKey(root.id)) || [],
+      replies: repliesByRoot.get(idKey(root.id)) || [],
     }));
   };
 
@@ -7775,6 +7822,22 @@ export const CommentsSheet = memo(
   };
 
   const threads = useMemo(() => buildThreads(comments), [comments]);
+
+  // Initiate reply to a comment or a replyer
+  const handleInitiateReply = (comment: any) => {
+    const target = getReplyLabel(comment);
+    const rootId = findRootCommentId(comment, comments);
+    setReplyTo({
+      ...comment,
+      _reply_author: target,
+      _root_id: rootId,
+    });
+    if (rootId) {
+      toggleThread(rootId, true);
+    }
+    inputRef.current?.focus();
+    setShowEmojiPicker(false);
+  };
 
   // Handle comment submission with image support
   const handleSubmit = async (e: React.FormEvent) => {
@@ -7801,6 +7864,8 @@ export const CommentsSheet = memo(
     const replyDisplay = replyTo?._reply_author?.display;
     const prefix = replyDisplay ? `${replyDisplay} ` : '';
     const finalText = replyTo && !t.startsWith(prefix) ? prefix + t : t;
+    const rootId = replyTo?._root_id || (replyTo ? findRootCommentId(replyTo, comments) : null);
+    const parentCommentId = replyTo?.id || null;
 
     // Optimistic comment
     const optimisticComment = {
@@ -7809,7 +7874,7 @@ export const CommentsSheet = memo(
       user_id: safeUserId(currentUser),
       text: finalText,
       image_url: uploadedImageUrl,
-      parent_comment_id: replyTo?.id || null,
+      parent_comment_id: parentCommentId,
       created_at: new Date().toISOString(),
       replies_count: 0,
       likes_count: 0,
@@ -7830,6 +7895,10 @@ export const CommentsSheet = memo(
       return next;
     });
 
+    if (rootId) {
+      toggleThread(rootId, true);
+    }
+
     if (onComment) {
       onComment(postId, finalText, selectedImage || undefined);
     }
@@ -7840,7 +7909,7 @@ export const CommentsSheet = memo(
       let body: any = {
         text: finalText,
         user_id: safeUserId(currentUser),
-        parent_comment_id: replyTo?.id || null,
+        parent_comment_id: parentCommentId,
       };
       
       if (uploadedImageUrl) {
@@ -7891,29 +7960,38 @@ export const CommentsSheet = memo(
     return () => window.removeEventListener('focus', handleFocus);
   }, [postId, itemType]);
 
-  // Render single comment (UPDATED with Facebook/Reels style)
+  // Render single comment (Facebook style)
   const renderOneComment = (comment: any, isReply: boolean = false) => {
     const a = resolveAuthor(comment);
     const isCurrentUserComment = a.uid === safeUserId(currentUser);
     const isFollowing = checkIsFollowing ? checkIsFollowing(a.uid) : false;
+    const authorUser = users.find((x: any) => Number(x?.id) === a.uid);
 
     return (
-      <div className={`flex gap-3 ${isReply ? 'mt-3' : ''}`}>
+      <div className={`flex gap-2.5 sm:gap-3 ${isReply ? 'mt-2.5' : ''}`}>
         <img
           src={a.image}
-          className="w-9 h-9 rounded-full object-cover cursor-pointer shrink-0"
+          className={`${
+            isReply ? 'w-8 h-8' : 'w-9 h-9'
+          } rounded-full object-cover cursor-pointer shrink-0 mt-0.5 hover:opacity-90 transition-opacity`}
           alt=""
           onClick={() => a.uid && onProfileClick(a.uid)}
         />
         <div className="flex-1 min-w-0">
-          <div className="inline-block max-w-[315px] bg-[#0F172A] rounded-[18px] px-3.5 py-2 border border-[#1E293B]">
+          <div className="inline-block max-w-full sm:max-w-[92%] bg-[#242526] rounded-[18px] px-3.5 py-2 sm:px-4 sm:py-2.5 border border-[#3A3B3C]/50 shadow-sm">
             <div
-              className="text-[#E4E6EB] font-black text-[15px] leading-tight cursor-pointer hover:underline"
+              className="text-[#F0F2F5] font-bold text-[13px] sm:text-[14px] leading-tight cursor-pointer hover:underline inline-flex items-center gap-1.5"
               onClick={() => a.uid && onProfileClick(a.uid)}
             >
-              {a.name}
+              <span className="truncate">{a.name}</span>
+              {(comment?.is_verified || authorUser?.is_verified) && (
+                <i
+                  className="fas fa-check-circle text-[#1877F2] text-[12px] shrink-0"
+                  title="Verified"
+                />
+              )}
             </div>
-            <div className="text-[#E4E6EB] text-[15px] leading-[1.28] font-medium whitespace-pre-wrap break-words mt-0.5">
+            <div className="text-[#E4E6EB] text-[15px] leading-[1.35] font-normal whitespace-pre-wrap break-words mt-1">
               <RichText
                 text={String(comment.text || '')}
                 users={users}
@@ -7922,20 +8000,24 @@ export const CommentsSheet = memo(
               />
             </div>
             {comment.image_url && (
-              <div className="mt-2 rounded-lg overflow-hidden">
+              <div className="mt-2 rounded-xl overflow-hidden">
                 <img
                   src={comment.image_url}
                   alt="Comment attachment"
-                  className="max-w-full max-h-[200px] object-cover rounded-lg cursor-pointer"
+                  className="max-w-full max-h-[220px] object-cover rounded-xl cursor-pointer hover:opacity-95 transition-opacity"
                   onClick={() => window.open(comment.image_url, '_blank')}
                 />
               </div>
             )}
           </div>
-          <div className="mt-1 ml-3 flex items-center gap-4">
+          <div className="mt-1 ml-3 flex items-center gap-3 sm:gap-4 text-[12px]">
+            <span className="text-[#B0B3B8] font-normal">
+              {formatRelativeTime(comment.created_at || comment.createdAt || comment.timestamp)}
+            </span>
             <button
+              type="button"
               onClick={() => handleLikeComment(comment)}
-              className={`text-[13px] font-bold ${
+              className={`font-bold hover:underline transition-colors ${
                 comment.liked_by_me
                   ? 'text-[#1877F2]'
                   : 'text-[#B0B3B8] hover:text-[#E4E6EB]'
@@ -7944,25 +8026,16 @@ export const CommentsSheet = memo(
               {comment.liked_by_me ? 'Liked' : 'Like'}
             </button>
             <button
-              onClick={() => {
-                const target = getReplyLabel(comment);
-                setReplyTo({
-                  ...comment,
-                  _reply_author: target,
-                });
-                inputRef.current?.focus();
-                setShowEmojiPicker(false);
-              }}
-              className="text-[13px] font-bold text-[#B0B3B8] hover:text-[#E4E6EB]"
+              type="button"
+              onClick={() => handleInitiateReply(comment)}
+              className="font-bold text-[#B0B3B8] hover:text-[#E4E6EB] hover:underline transition-colors"
             >
               Reply
             </button>
-            <span className="text-[13px] font-bold text-[#B0B3B8]">
-              {formatRelativeTime(comment.created_at || comment.createdAt || comment.timestamp)}
-            </span>
             {comment.likes_count > 0 && (
-              <span className="text-[13px] font-bold text-[#B0B3B8]">
-                {formatCount(comment.likes_count)}
+              <span className="inline-flex items-center gap-1 bg-[#1877F2]/20 text-[#1877F2] px-1.5 py-0.5 rounded-full text-[11px] font-bold">
+                <i className="fas fa-thumbs-up text-[9px]" />
+                <span>{formatCount(comment.likes_count)}</span>
               </span>
             )}
           </div>
@@ -8120,16 +8193,19 @@ export const CommentsSheet = memo(
                     {!isExpanded && hiddenCount > 0 && (
                       <button
                         type="button"
-                        className="ml-12 text-[#1877F2] font-bold text-[16px] hover:underline"
+                        className="ml-11 sm:ml-12 text-[#1877F2] font-semibold text-[13px] sm:text-[14px] hover:underline flex items-center gap-1.5 py-1"
                         onClick={() => toggleThread(rootId, true)}
                       >
-                        View previous {hiddenCount} repl{hiddenCount === 1 ? 'y' : 'ies'}
+                        <i className="fas fa-reply fa-rotate-180 text-[11px]" />
+                        <span>
+                          View previous {hiddenCount} repl{hiddenCount === 1 ? 'y' : 'ies'}
+                        </span>
                       </button>
                     )}
 
                     {visibleReplies.map((reply) => (
-                      <div key={String(reply.id)} className="ml-12 relative">
-                        <div className="absolute -left-6 top-0 bottom-0 w-[2px] bg-[#1E293B] rounded-full" />
+                      <div key={String(reply.id)} className="ml-10 sm:ml-12 relative">
+                        <div className="absolute -left-5 sm:-left-6 top-0 bottom-0 w-[2px] bg-[#334155]/60 rounded-full" />
                         {renderOneComment(reply, true)}
                       </div>
                     ))}
@@ -8137,7 +8213,7 @@ export const CommentsSheet = memo(
                     {isExpanded && replies.length > MAX_PREVIEW && (
                       <button
                         type="button"
-                        className="ml-12 text-[#B0B3B8] text-[15px] hover:text-[#E4E6EB]"
+                        className="ml-11 sm:ml-12 text-[#B0B3B8] text-[13px] hover:text-[#E4E6EB] hover:underline py-1"
                         onClick={() => toggleThread(rootId, false)}
                       >
                         Hide replies
