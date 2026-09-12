@@ -26,6 +26,70 @@ const getCachedFileUrl = async (url: string): Promise<string> => {
 };
 
 /* ============================================================
+   ✅ CACHE HELPERS FOR MESSAGE HISTORY & CONVERSATION IDS
+   Prevents re-requesting and reloading on every open.
+============================================================ */
+const MSGS_CACHE_KEY_PREFIX = "unera_chat_msgs_v3_";
+const CID_CACHE_KEY_PREFIX = "unera_chat_cid_v3_";
+const inMemoryChatCache = new Map<string, any[]>();
+const inMemoryCidCache = new Map<string, number>();
+
+export const getCachedMessages = (userId: number, recipientId: number): any[] => {
+  if (!userId || !recipientId) return [];
+  const key = `${userId}_${recipientId}`;
+  if (inMemoryChatCache.has(key)) {
+    return inMemoryChatCache.get(key)!;
+  }
+  try {
+    const raw = localStorage.getItem(`${MSGS_CACHE_KEY_PREFIX}${key}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        inMemoryChatCache.set(key, parsed);
+        return parsed;
+      }
+    }
+  } catch {}
+  return [];
+};
+
+export const setCachedMessages = (userId: number, recipientId: number, messages: any[]) => {
+  if (!userId || !recipientId) return;
+  const key = `${userId}_${recipientId}`;
+  const slice = messages.slice(-200);
+  inMemoryChatCache.set(key, slice);
+  try {
+    localStorage.setItem(`${MSGS_CACHE_KEY_PREFIX}${key}`, JSON.stringify(slice));
+  } catch {}
+};
+
+export const getCachedCid = (userId: number, recipientId: number): number => {
+  if (!userId || !recipientId) return 0;
+  const key = `${userId}_${recipientId}`;
+  if (inMemoryCidCache.has(key)) return inMemoryCidCache.get(key)!;
+  try {
+    const raw = localStorage.getItem(`${CID_CACHE_KEY_PREFIX}${key}`);
+    if (raw) {
+      const val = Number(raw);
+      if (Number.isFinite(val) && val > 0) {
+        inMemoryCidCache.set(key, val);
+        return val;
+      }
+    }
+  } catch {}
+  return 0;
+};
+
+export const setCachedCid = (userId: number, recipientId: number, cid: number) => {
+  if (!userId || !recipientId || !cid) return;
+  const key = `${userId}_${recipientId}`;
+  inMemoryCidCache.set(key, cid);
+  try {
+    localStorage.setItem(`${CID_CACHE_KEY_PREFIX}${key}`, String(cid));
+  } catch {}
+};
+
+/* ============================================================
    ✅ NATIVE APP DETECTION & PICKER HELPERS
 ============================================================ */
 const isUneraNativeApp = (): boolean => {
@@ -267,14 +331,14 @@ const DeliveryTicks: React.FC<{ msg: any; mine: boolean }> = ({ msg, mine }) => 
   const delivered = isMsgDelivered(msg);
 
   if (seen) {
-    return <i className="fas fa-check-double text-[11px]" style={{ color: "#1B74E4" }} />;
+    return <i className="fas fa-check-double text-[11px] text-[#0084FF]" />;
   }
 
   if (delivered) {
-    return <i className="fas fa-check-double text-[11px]" style={{ color: "#b0b3b8" }} />;
+    return <i className="fas fa-check-double text-[11px] text-[#8E8E93]" />;
   }
 
-  return <i className="fas fa-check text-[11px]" style={{ color: "#b0b3b8" }} />;
+  return <i className="fas fa-check text-[11px] text-[#8E8E93]" />;
 };
 
 const formatLastSeen = (iso: string) => {
@@ -321,8 +385,8 @@ const URLPreview: React.FC<{ url: string }> = ({ url }) => {
 
   if (loading) {
     return (
-      <div className="mt-1 p-3 rounded-xl border border-[#3E4042] bg-[#262626] animate-pulse w-full max-w-full overflow-hidden">
-        <div className="h-4 bg-[#3a3a3a] rounded w-3/4" />
+      <div className="mt-1 p-3 rounded-xl border border-[#242526] bg-[#18191A] animate-pulse w-full max-w-full overflow-hidden">
+        <div className="h-4 bg-[#2C2D30] rounded w-3/4" />
       </div>
     );
   }
@@ -332,16 +396,16 @@ const URLPreview: React.FC<{ url: string }> = ({ url }) => {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="mt-1 p-3 rounded-xl border border-[#3E4042] bg-[#262626] flex items-center gap-3 hover:bg-[#2f2f2f] transition-colors no-underline w-full max-w-full overflow-hidden"
+      className="mt-1 p-3 rounded-xl border border-[#242526] bg-[#18191A] flex items-center gap-3 hover:bg-[#222325] transition-colors no-underline w-full max-w-full overflow-hidden"
       onClick={(e) => e.stopPropagation()}
       style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
     >
-      <i className="fas fa-link text-xl text-[#1B74E4] shrink-0" />
+      <i className="fas fa-link text-xl text-[#0084FF] shrink-0" />
       <div className="flex-1 min-w-0">
-        <div className="text-[#e4e6eb] font-medium truncate">{previewData?.domain || "Link"}</div>
-        <div className="text-[#b0b3b8] text-xs truncate">{url}</div>
+        <div className="text-white font-medium truncate">{previewData?.domain || "Link"}</div>
+        <div className="text-[#8E8E93] text-xs truncate">{url}</div>
       </div>
-      <i className="fas fa-external-link-alt text-[#b0b3b8] shrink-0" />
+      <i className="fas fa-external-link-alt text-[#8E8E93] shrink-0" />
     </a>
   );
 };
@@ -381,7 +445,7 @@ const GIFPreview: React.FC<{
   };
 
   const embedUrl = getEmbedUrl();
-  const wrapCls = "mt-1 rounded-2xl overflow-hidden border border-[#3E4042] bg-[#262626] w-[220px] max-w-full relative";
+  const wrapCls = "mt-1 rounded-2xl overflow-hidden border border-[#242526] bg-[#18191A] w-[220px] max-w-full relative";
 
   const DownloadButton = () => {
     if (!onDownload) return null;
@@ -541,7 +605,7 @@ const VoiceNoteWA: React.FC<{
   const pct = safeDuration(duration) > 0 ? Math.min(1, Math.max(0, current / safeDuration(duration))) : 0;
   const activeBars = Math.floor(pct * wave.length);
 
-  const bg = isMine ? "#1B74E4" : "#3A3B3C";
+  const bg = isMine ? "#0084FF" : "#242526";
   const waveOff = "rgba(255,255,255,0.35)";
   const waveOn = "rgba(255,255,255,0.95)";
   const isDownloading = downloadState?.downloading;
@@ -674,8 +738,8 @@ const AttachmentPreview: React.FC<{
 
   if (isImage) {
     return (
-      <div className="relative rounded-xl overflow-hidden border border-[#3E4042] cursor-pointer hover:opacity-90 transition-opacity w-full max-w-full">
-        <img src={url} alt={name} className="w-full max-h-[400px] object-contain bg-black/20" onClick={onView} />
+      <div className="relative rounded-2xl overflow-hidden border border-[#242526] cursor-pointer hover:opacity-95 transition-opacity w-full max-w-full">
+        <img src={url} alt={name} className="w-full max-h-[400px] object-contain bg-black/40" onClick={onView} />
         {onDownload && (
           <button
             onClick={handleDownload}
@@ -696,8 +760,8 @@ const AttachmentPreview: React.FC<{
 
   if (isVideo) {
     return (
-      <div className="relative rounded-xl overflow-hidden border border-[#3E4042] cursor-pointer w-full max-w-full">
-        <video src={url} className="w-full max-h-[400px] object-contain bg-black/20" controls onClick={onView} />
+      <div className="relative rounded-2xl overflow-hidden border border-[#242526] cursor-pointer w-full max-w-full">
+        <video src={url} className="w-full max-h-[400px] object-contain bg-black/40" controls onClick={onView} />
         {onDownload && (
           <button
             onClick={handleDownload}
@@ -723,16 +787,16 @@ const AttachmentPreview: React.FC<{
   return (
     <div
       className={[
-        "p-4 rounded-xl border bg-[#262626] flex items-center gap-3 cursor-pointer hover:bg-[#2f2f2f] transition-colors w-full max-w-full overflow-hidden",
-        isMine ? "border-[#1B74E4]/30" : "border-[#3E4042]",
+        "p-3.5 rounded-2xl border bg-[#18191A] flex items-center gap-3 cursor-pointer hover:bg-[#222325] transition-colors w-full max-w-full overflow-hidden",
+        isMine ? "border-[#0084FF]/30" : "border-[#242526]",
       ].join(" ")}
       onClick={onView}
       style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
     >
-      <i className={`${getFileIcon(mime || "")} text-3xl text-[#1B74E4] shrink-0`} />
+      <i className={`${getFileIcon(mime || "")} text-3xl text-[#0084FF] shrink-0`} />
       <div className="flex-1 min-w-0">
-        <div className="text-[#e4e6eb] font-medium truncate">{name}</div>
-        {size ? <div className="text-[#b0b3b8] text-xs">{formatFileSize(size)}</div> : null}
+        <div className="text-white font-medium truncate">{name}</div>
+        {size ? <div className="text-[#8E8E93] text-xs">{formatFileSize(size)}</div> : null}
       </div>
       {onDownload && (
         <button
@@ -740,11 +804,11 @@ const AttachmentPreview: React.FC<{
           className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors shrink-0"
         >
           {isDownloading ? (
-            <span className="text-[#1B74E4] text-xs font-bold">{progress}%</span>
+            <span className="text-[#0084FF] text-xs font-bold">{progress}%</span>
           ) : isCompleted ? (
             <i className="fas fa-check text-green-500 text-sm" />
           ) : (
-            <i className="fas fa-download text-[#b0b3b8] text-sm hover:text-[#1B74E4] transition-colors" />
+            <i className="fas fa-download text-[#8E8E93] text-sm hover:text-[#0084FF] transition-colors" />
           )}
         </button>
       )}
@@ -775,7 +839,7 @@ const Avatar: React.FC<{ src?: string | null; name?: string; size?: number; clas
       <img
         src={url}
         alt={name}
-        className={`rounded-full object-cover ${className}`}
+        className={`rounded-full object-cover border border-[#242526] bg-[#1C1E21] ${className}`}
         style={{ width: size, height: size }}
         onError={(e) => {
           const img = e.currentTarget;
@@ -784,7 +848,7 @@ const Avatar: React.FC<{ src?: string | null; name?: string; size?: number; clas
             "data:image/svg+xml;charset=utf-8," +
             encodeURIComponent(
               `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
-                <rect width="100%" height="100%" fill="#3A3B3C"/>
+                <rect width="100%" height="100%" fill="#242526"/>
                 <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="${Math.max(
                   14,
                   Math.floor(size * 0.38)
@@ -798,7 +862,7 @@ const Avatar: React.FC<{ src?: string | null; name?: string; size?: number; clas
 
   return (
     <div
-      className={`rounded-full bg-[#3A3B3C] flex items-center justify-center text-[#E4E6EB] font-semibold ${className}`}
+      className={`rounded-full bg-[#242526] flex items-center justify-center text-white font-bold border border-[#2D3035] ${className}`}
       style={{ width: size, height: size, fontSize: Math.max(14, Math.floor(size * 0.38)) }}
       aria-label={name}
       title={name}
@@ -832,14 +896,14 @@ const QUICK_GIFS: Array<{ title: string; url: string }> = [
 
 const GifPanel: React.FC<{ onSelect: (url: string) => void }> = ({ onSelect }) => {
   return (
-    <div className="p-3">
-      <div className="text-[12px] text-[#b0b3b8] mb-2">GIFs</div>
+    <div className="p-3 bg-[#121212]">
+      <div className="text-[12px] text-[#8E8E93] mb-2 font-semibold">Trending GIFs</div>
       <div className="grid grid-cols-3 gap-2">
         {QUICK_GIFS.map((g) => (
           <button
             key={g.url}
             type="button"
-            className="rounded-xl overflow-hidden border border-[#333] bg-[#262626] hover:opacity-90 transition-opacity"
+            className="rounded-xl overflow-hidden border border-[#242526] bg-[#18191A] hover:opacity-90 active:scale-95 transition-all"
             onClick={() => onSelect(g.url)}
           >
             <img src={g.url} alt={g.title} className="w-full h-[86px] object-cover" />
@@ -869,16 +933,16 @@ const CallMessage: React.FC<{
     .trim();
 
   return (
-    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${
-      mine ? "bg-[#1B74E4] text-white" : "bg-[#3A3B3C] text-[#e4e6eb]"
+    <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl ${
+      mine ? "bg-[#0084FF] text-white" : "bg-[#242526] text-[#F0F2F5]"
     }`}>
       <span className="text-sm">{icon}</span>
       <span className="text-xs flex-1">{cleanText}</span>
       {isMissed && onCallBack && (
         <button
           onClick={() => onCallBack(callType)}
-          className={`text-xs px-2 py-1 rounded-full ${
-            mine ? "bg-white/20 hover:bg-white/30" : "bg-black/20 hover:bg-black/30"
+          className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+            mine ? "bg-white/20 hover:bg-white/30 text-white" : "bg-[#0084FF] hover:bg-[#0073E6] text-white"
           } transition-colors`}
         >
           Call back
@@ -911,12 +975,24 @@ type ActionModalState =
    ✅ Main ChatWindow
 ============================================================ */
 export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, onClose, onSendMessage }) => {
+  const currentUserId = safeNum((currentUser as any)?.id);
+  const recipientId = safeNum((recipient as any)?.id);
+
+  // Initialize immediately from cached message history
+  const initialMsgs = useMemo(() => {
+    return getCachedMessages(currentUserId, recipientId);
+  }, [currentUserId, recipientId]);
+
+  const initialCid = useMemo(() => {
+    return getCachedCid(currentUserId, recipientId);
+  }, [currentUserId, recipientId]);
+
   const [inputText, setInputText] = useState("");
-  const [msgs, setMsgs] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [msgs, setMsgs] = useState<Message[]>(initialMsgs);
+  const [loading, setLoading] = useState<boolean>(() => initialMsgs.length === 0);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [conversationId, setConversationId] = useState<number>(0);
+  const [conversationId, setConversationId] = useState<number>(initialCid);
   const [viewingAttachment, setViewingAttachment] = useState<any>(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
 
@@ -1019,8 +1095,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
   const pollRef = useRef<number | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const currentUserId = safeNum((currentUser as any)?.id);
 
   // ✅ SCROLL STATE - Don't force scroll when user is reading old messages
   const shouldStickToBottomRef = useRef(true);
@@ -1295,26 +1369,41 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
   }, [currentUserId]);
 
   const fetchHistory = useCallback(async () => {
-    if (!currentUserId) return;
+    if (!currentUserId || !recipientId) return;
 
     try {
-      setLoading(true);
+      if (msgs.length === 0 && initialMsgs.length === 0) {
+        setLoading(true);
+      }
 
-      const conversations = await apiFetch("/api/messages/conversations", {}, currentUserId);
-      const conv = Array.isArray(conversations)
-        ? conversations.find((c: any) => safeNum(c?.other_user_id) === safeNum((recipient as any)?.id))
-        : null;
+      let cid = conversationId || getCachedCid(currentUserId, recipientId);
 
-      const cid = safeNum(conv?.id, 0);
-      setConversationId(cid);
+      if (!cid) {
+        const conversations = await apiFetch("/api/messages/conversations", {}, currentUserId);
+        const conv = Array.isArray(conversations)
+          ? conversations.find((c: any) => safeNum(c?.other_user_id) === recipientId)
+          : null;
+
+        cid = safeNum(conv?.id, 0);
+        if (cid) {
+          setConversationId(cid);
+          setCachedCid(currentUserId, recipientId, cid);
+        }
+      }
 
       if (cid) {
         const history = await apiFetch(`/api/messages/conversations/${cid}`, {}, currentUserId);
         const incoming = Array.isArray(history) ? history : [];
-        setMsgs((prev) => mergeByIdPreserveRefs(prev, incoming));
+        setMsgs((prev) => {
+          const merged = mergeByIdPreserveRefs(prev, incoming);
+          setCachedMessages(currentUserId, recipientId, merged);
+          return merged;
+        });
         markRead(cid);
       } else {
-        setMsgs([]);
+        if (initialMsgs.length === 0) {
+          setMsgs([]);
+        }
       }
 
       setTimeout(() => {
@@ -1324,7 +1413,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
     } finally {
       setLoading(false);
     }
-  }, [recipient?.id, markRead, currentUserId, mergeByIdPreserveRefs]);
+  }, [recipientId, markRead, currentUserId, mergeByIdPreserveRefs, conversationId, msgs.length, initialMsgs.length]);
 
   const heartbeat = useCallback(async () => {
     if (!currentUserId) return;
@@ -1840,7 +1929,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
     const fullPayload = { sender_id: currentUserId, ...payload };
     const data = await apiFetch("/api/messages/send", { method: "POST", body: JSON.stringify(fullPayload) }, currentUserId);
     const msg = data?.message ? { ...data.message, attachments: Array.isArray(data.attachments) ? data.attachments : [] } : data;
-    setMsgs((prev) => mergeByIdPreserveRefs(prev, [msg]));
+    setMsgs((prev) => {
+      const merged = mergeByIdPreserveRefs(prev, [msg]);
+      setCachedMessages(currentUserId, recipientId, merged);
+      return merged;
+    });
     if (!conversationId) fetchHistory();
     return msg;
   };
@@ -1901,7 +1994,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
       if (editTarget?.id) {
         const updated = await apiFetch(`/api/messages/${editTarget.id}`, { method: "PUT", body: JSON.stringify({ text_content: trimmed, user_id: currentUserId }) }, currentUserId);
         const updatedMsg = updated?.message || null;
-        if (updatedMsg?.id) setMsgs((prev) => mergeByIdPreserveRefs(prev, [updatedMsg]));
+        if (updatedMsg?.id) {
+          setMsgs((prev) => {
+            const merged = mergeByIdPreserveRefs(prev, [updatedMsg]);
+            setCachedMessages(currentUserId, recipientId, merged);
+            return merged;
+          });
+        }
         setEditTarget(null); setInputText("");
         return;
       }
@@ -1919,7 +2018,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
     if (!currentUserId) return;
     try {
       await apiFetch(`/api/messages/${safeNum(m?.id)}`, { method: "DELETE", body: JSON.stringify({ delete_for_everyone: deleteForEveryone, user_id: currentUserId }) }, currentUserId);
-      setMsgs((prev) => prev.filter((x: any) => safeNum(x?.id) !== safeNum(m?.id)));
+      setMsgs((prev) => {
+        const filtered = prev.filter((x: any) => safeNum(x?.id) !== safeNum(m?.id));
+        setCachedMessages(currentUserId, recipientId, filtered);
+        return filtered;
+      });
     } catch (e: any) { alert(e?.message || "Failed to delete"); }
   };
 
@@ -1943,7 +2046,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
   };
 
   const actionBtn = (icon: string, label: string, onClick: () => void, danger = false) => (
-    <button type="button" onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#2d2d2d] active:bg-[#333] transition-colors ${danger ? "text-[#ff6b6b]" : "text-[#e4e6eb]"}`}>
+    <button type="button" onClick={onClick} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl hover:bg-[#242526] active:bg-[#2D3035] transition-colors ${danger ? "text-[#ff6b6b]" : "text-[#F0F2F5]"}`}>
       <i className={`${icon} text-[18px]`} /><span className="text-[15px] font-medium">{label}</span>
     </button>
   );
@@ -1955,47 +2058,105 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
   const peerDisplayAvatar = callHasPeer ? (callPeerAvatar ?? null) : (((recipient as any)?.profile_image_url || (recipient as any)?.avatar_url || null) as string | null);
 
   return (
-    <div className="fixed inset-0 z-[200] bg-[#1e1e1e] flex flex-col font-sans overflow-x-hidden">
+    <div className="fixed inset-0 z-[200] bg-[#000000] flex flex-col font-sans overflow-x-hidden text-white">
       <style>{`html, body { overflow-x: hidden; } .msgText, .msgText a { overflow-wrap: anywhere; word-break: break-word; }`}</style>
 
       <input type="file" ref={fileInputRef} className="hidden" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={handleFileSelect} />
 
       {/* Header with edge-to-edge status bar padding */}
-      <div className="pt-[env(safe-area-inset-top,0px)] border-b border-[#333] bg-[#1e1e1e]">
-        <div className="h-14 px-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-          <button type="button" onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#2d2d2d] transition-colors" aria-label="Back"><i className="fas fa-arrow-left text-[18px] text-[#e4e6eb]" /></button>
-          <div className="flex items-center gap-2 min-w-0">
-            <Avatar src={(recipient as any)?.profile_image_url} name={(recipient as any)?.name} size={36} />
-            <div className="min-w-0">
-              <div className="text-[15px] font-semibold text-[#e4e6eb] truncate">{safeStr((recipient as any)?.name)}</div>
-              <div className="text-[12px] text-[#b0b3b8] truncate flex items-center">{recipientOnline ? <>Online<span className="inline-block w-2 h-2 rounded-full bg-green-500 ml-2 animate-pulse" /></> : (recipientLastSeen ? formatLastSeen(recipientLastSeen) : "Offline")}</div>
+      <div className="pt-[env(safe-area-inset-top,0px)] border-b border-[#1A1A1A] bg-[#000000]">
+        <div className="h-14 px-2 sm:px-3 flex items-center justify-between">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#1A1A1A] active:scale-95 transition-all text-[#0084FF]"
+              aria-label="Back"
+            >
+              <i className="fas fa-arrow-left text-[18px]" />
+            </button>
+            <div className="flex items-center gap-2.5 min-w-0 cursor-pointer">
+              <div className="relative shrink-0">
+                <Avatar src={(recipient as any)?.profile_image_url} name={(recipient as any)?.name} size={38} />
+                {recipientOnline && (
+                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#31A24C] rounded-full ring-2 ring-black" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="text-[15px] sm:text-[16px] font-bold text-white truncate leading-tight">
+                  {safeStr((recipient as any)?.name)}
+                </div>
+                <div className="text-[12px] truncate flex items-center leading-tight">
+                  {recipientOnline ? (
+                    <span className="text-[#31A24C] font-medium flex items-center gap-1">
+                      Active now
+                    </span>
+                  ) : (
+                    <span className="text-[#8E8E93]">
+                      {recipientLastSeen ? formatLastSeen(recipientLastSeen) : "Offline"}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <button type="button" className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#2d2d2d]" aria-label="Voice Call" onClick={() => startOutgoingCall("voice")}><i className="fas fa-phone text-[18px] text-[#1B74E4]" /></button>
-          <button type="button" className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#2d2d2d]" aria-label="Video Call" onClick={() => startOutgoingCall("video")}><i className="fas fa-video text-[18px] text-[#1B74E4]" /></button>
-          <button type="button" className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#2d2d2d]" aria-label="Info"><i className="fas fa-circle-info text-[18px] text-[#1B74E4]" /></button>
+          <div className="flex items-center gap-1 text-[#0084FF]">
+            <button
+              type="button"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#1A1A1A] active:scale-95 transition-all text-[#0084FF]"
+              aria-label="Voice Call"
+              onClick={() => startOutgoingCall("voice")}
+            >
+              <i className="fas fa-phone text-[17px]" />
+            </button>
+            <button
+              type="button"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#1A1A1A] active:scale-95 transition-all text-[#0084FF]"
+              aria-label="Video Call"
+              onClick={() => startOutgoingCall("video")}
+            >
+              <i className="fas fa-video text-[17px]" />
+            </button>
+            <button
+              type="button"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#1A1A1A] active:scale-95 transition-all text-[#0084FF]"
+              aria-label="Info"
+            >
+              <i className="fas fa-circle-info text-[18px]" />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
 
       {/* Reply/Edit banner */}
       {(replyTo || editTarget) && (
-        <div className="px-3 py-2 border-b border-[#333] bg-[#161616]">
+        <div className="px-3 py-2 border-b border-[#1A1A1A] bg-[#121212]">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0"><div className="text-[12px] text-[#b0b3b8]">{editTarget ? "Editing message" : "Replying to"}</div><div className="text-[13px] text-[#e4e6eb] truncate">{safeStr((editTarget || replyTo)?.text_content) || "…"}</div></div>
-            <button type="button" onClick={() => { setReplyTo(null); setEditTarget(null); }} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[#2d2d2d]" aria-label="Cancel"><i className="fas fa-xmark text-[#e4e6eb]" /></button>
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-[#0084FF]">
+                {editTarget ? "Editing message" : "Replying to"}
+              </div>
+              <div className="text-[13px] text-[#F0F2F5] truncate mt-0.5">
+                {safeStr((editTarget || replyTo)?.text_content) || "…"}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setReplyTo(null); setEditTarget(null); }}
+              className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[#242526] text-[#8E8E93] hover:text-white"
+              aria-label="Cancel"
+            >
+              <i className="fas fa-xmark text-sm" />
+            </button>
           </div>
         </div>
       )}
 
-      {/* ✅ Uploading progress bar */}
+      {/* Uploading progress bar */}
       {uploading && (
-        <div className="h-[3px] bg-[#1e1e1e] border-b border-[#333]">
+        <div className="h-[2px] bg-[#1A1A1A] overflow-hidden">
           <div 
-            className="h-full bg-[#1B74E4] transition-all duration-300" 
+            className="h-full bg-[#0084FF] transition-all duration-300" 
             style={{ width: `${Math.max(8, uploadProgress)}%` }} 
           />
         </div>
@@ -2003,19 +2164,53 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
 
       {/* Recording indicator */}
       {recording && (
-        <div className="px-3 py-3 border-b border-[#333] bg-[#161616]">
+        <div className="px-3 py-2.5 border-b border-[#1A1A1A] bg-[#121212]">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3"><div className="flex items-center gap-1"><i className="fas fa-circle text-[#ff4d4d] text-[8px] animate-pulse" /><span className="text-[#e4e6eb] text-sm font-medium">{recordSeconds}s</span></div><div className="flex items-center gap-[2px] h-6">{recordingWave.map((height, i) => (<div key={i} className="w-[3px] bg-[#1B74E4] rounded-full transition-all duration-75" style={{ height: `${height / 2}px` }} />))}</div></div>
-            <button type="button" onClick={() => stopVoiceNote(true)} className="px-3 py-1 rounded-full bg-[#2d2d2d] text-[#ff6b6b] text-sm font-medium hover:bg-[#3a3a3a] transition-colors">Cancel</button>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <i className="fas fa-circle text-[#ff4d4d] text-[8px] animate-pulse" />
+                <span className="text-white text-sm font-semibold">{recordSeconds}s</span>
+              </div>
+              <div className="flex items-center gap-[2px] h-6">
+                {recordingWave.map((height, i) => (
+                  <div
+                    key={i}
+                    className="w-[3px] bg-[#0084FF] rounded-full transition-all duration-75"
+                    style={{ height: `${height / 2}px` }}
+                  />
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => stopVoiceNote(true)}
+              className="px-3 py-1 rounded-full bg-[#242526] text-[#ff6b6b] text-xs font-semibold hover:bg-[#2D3035] transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
 
       {/* Messages */}
-      <div ref={listRef} className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 py-3 bg-[#1e1e1e]" onClick={() => { setShowEmoji(false); setShowStickers(false); setShowAttachmentMenu(false); setShowGifs(false); }}>
-        {loading && msgs.length === 0 ? (<div className="text-center text-[#b0b3b8] text-sm py-6">Loading…</div>) : null}
+      <div
+        ref={listRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-3 py-3 bg-[#000000]"
+        onClick={() => { setShowEmoji(false); setShowStickers(false); setShowAttachmentMenu(false); setShowGifs(false); }}
+      >
+        {loading && msgs.length === 0 ? (
+          <div className="text-center text-[#8E8E93] text-sm py-8">Loading messages…</div>
+        ) : null}
         {rows.map((r, index) => {
-          if (r.type === "day") return (<div key={r.key} className="flex items-center justify-center my-2"><div className="text-[12px] text-[#b0b3b8] bg-[#2d2d2d] px-3 py-1 rounded-full">{r.day}</div></div>);
+          if (r.type === "day") {
+            return (
+              <div key={r.key} className="flex items-center justify-center my-3">
+                <div className="text-[11px] font-semibold text-[#8E8E93] bg-[#141414] border border-[#222222] px-3 py-1 rounded-full">
+                  {r.day}
+                </div>
+              </div>
+            );
+          }
           const msg = r.msg as any;
           const mine = safeNum(msg?.sender_id) === safeNum((currentUser as any)?.id);
           const rawText = safeStr(msg?.text_content);
@@ -2034,17 +2229,51 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
           const nextMsg = nextRow?.type === "msg" ? (nextRow as any).msg : null;
           const sameAsPrev = !!prevMsg && safeNum(prevMsg?.sender_id) === safeNum(msg?.sender_id);
           const sameAsNext = !!nextMsg && safeNum(nextMsg?.sender_id) === safeNum(msg?.sender_id);
-          const rowMb = sameAsNext ? "mb-[1px]" : "mb-[6px]";
-          const bubbleRadius = mine ? [`rounded-tl-2xl rounded-bl-2xl`, sameAsPrev ? "rounded-tr-md" : "rounded-tr-2xl", sameAsNext ? "rounded-br-md" : "rounded-br-2xl"].join(" ") : [`rounded-tr-2xl rounded-br-2xl`, sameAsPrev ? "rounded-tl-md" : "rounded-tl-2xl", sameAsNext ? "rounded-bl-md" : "rounded-bl-2xl"].join(" ");
+          const rowMb = sameAsNext ? "mb-[2px]" : "mb-[8px]";
+          const bubbleRadius = mine
+            ? [`rounded-2xl`, sameAsPrev ? "rounded-tr-md" : "rounded-tr-2xl", sameAsNext ? "rounded-br-md" : "rounded-br-2xl"].join(" ")
+            : [`rounded-2xl`, sameAsPrev ? "rounded-tl-md" : "rounded-tl-2xl", sameAsNext ? "rounded-bl-md" : "rounded-bl-2xl"].join(" ");
           const isCallMessage = rawText.includes("📞") || rawText.includes("🎥") || rawText.includes("Missed") || rawText.includes("Voice call") || rawText.includes("Video call");
           return (
             <div key={r.key} className={`w-full flex ${mine ? "justify-end" : "justify-start"} ${rowMb}`}>
               <div className={`max-w-[85%] sm:max-w-[75%] md:max-w-[65%] flex flex-col ${mine ? "items-end" : "items-start"} min-w-0`}>
                 {(text || parent || d || edited) && (
-                  <div className={["px-3 py-2 text-[15px] sm:text-[16px] leading-[1.25] break-words overflow-hidden", "select-none", mine ? "bg-[#1B74E4] text-white" : "bg-[#3A3B3C] text-[#e4e6eb]", bubbleRadius].join(" ")} onTouchStart={(e) => startLongPressAny({ msg, mine, kind: "message", evt: e })} onTouchEnd={cancelLongPress} onTouchMove={cancelLongPress} onMouseDown={(e) => startLongPressAny({ msg, mine, kind: "message", evt: e })} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress} style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
-                    {parent && (<div className={`mb-2 px-2 py-1.5 rounded-lg border-l-4 ${mine ? "bg-white/15 border-white/60" : "bg-black/20 border-[#1B74E4]"}`}><div className={`text-[11px] font-semibold ${mine ? "text-white/90" : "text-[#e4e6eb]"}`}>Reply</div><div className={`text-[12px] truncate max-w-[200px] ${mine ? "text-white/85" : "text-[#b0b3b8]"}`}>{safeStr(parent?.text_content) || (Array.isArray(parent?.attachments) && parent.attachments.length ? "📎 Attachment" : "…")}</div></div>)}
-                    {isCallMessage ? (<CallMessage msg={msg} mine={mine} onCallBack={rawText.includes("Missed") ? (mode) => startOutgoingCall(mode) : undefined} />) : (text && <div className="whitespace-pre-wrap msgText">{text}</div>)}
-                    {d && !isCallMessage && (<div className="flex justify-end items-center gap-1 mt-1"><span className={`text-[10px] ${mine ? "text-white/70" : "text-[#b0b3b8]"}`}>{formatTime(d)}{edited ? <span className="ml-1 opacity-80">(edited)</span> : null}</span><DeliveryTicks msg={msg} mine={mine} /></div>)}
+                  <div
+                    className={[
+                      "px-3.5 py-2 text-[15px] leading-[1.3] break-words overflow-hidden select-none transition-transform active:scale-[0.99]",
+                      mine ? "bg-[#0084FF] text-white shadow-sm shadow-[#0084FF]/20" : "bg-[#242526] text-[#F0F2F5]",
+                      bubbleRadius,
+                    ].join(" ")}
+                    onTouchStart={(e) => startLongPressAny({ msg, mine, kind: "message", evt: e })}
+                    onTouchEnd={cancelLongPress}
+                    onTouchMove={cancelLongPress}
+                    onMouseDown={(e) => startLongPressAny({ msg, mine, kind: "message", evt: e })}
+                    onMouseUp={cancelLongPress}
+                    onMouseLeave={cancelLongPress}
+                    style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
+                  >
+                    {parent && (
+                      <div className={`mb-2 px-2.5 py-1.5 rounded-xl border-l-[3px] ${mine ? "bg-black/20 border-white/80" : "bg-black/30 border-[#0084FF]"}`}>
+                        <div className={`text-[11px] font-bold ${mine ? "text-white/90" : "text-[#0084FF]"}`}>Reply</div>
+                        <div className={`text-[12px] truncate max-w-[200px] ${mine ? "text-white/85" : "text-[#8E8E93]"}`}>
+                          {safeStr(parent?.text_content) || (Array.isArray(parent?.attachments) && parent.attachments.length ? "📎 Attachment" : "…")}
+                        </div>
+                      </div>
+                    )}
+                    {isCallMessage ? (
+                      <CallMessage msg={msg} mine={mine} onCallBack={rawText.includes("Missed") ? (mode) => startOutgoingCall(mode) : undefined} />
+                    ) : (
+                      text && <div className="whitespace-pre-wrap msgText">{text}</div>
+                    )}
+                    {d && !isCallMessage && (
+                      <div className="flex justify-end items-center gap-1 mt-1">
+                        <span className={`text-[10px] tabular-nums ${mine ? "text-white/75" : "text-[#8E8E93]"}`}>
+                          {formatTime(d)}
+                          {edited ? <span className="ml-1 opacity-80">(edited)</span> : null}
+                        </span>
+                        <DeliveryTicks msg={msg} mine={mine} />
+                      </div>
+                    )}
                   </div>
                 )}
                 {gifUrls.length > 0 && gifUrls.map((url, idx) => {
@@ -2061,21 +2290,33 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
                   );
                 })}
                 {otherUrls.length > 0 && otherUrls.map((url, idx) => (<URLPreview key={`url:${url}:${idx}`} url={url} />))}
-                {attachments.length > 0 && (<div className="mt-[4px] space-y-1 w-full max-w-full">{attachments.map((a: any) => {
-                  const fileUrl = a?.url || a?.attachment_url;
-                  const downloadState = nativeDownloads[fileUrl];
-                  return (
-                    <div key={`att:${safeNum(a?.id) || 0}:${safeStr(fileUrl)}`} onTouchStart={(e) => startLongPressAny({ msg, mine, kind: "attachment", attachment: a, evt: e })} onTouchEnd={cancelLongPress} onTouchMove={cancelLongPress} onMouseDown={(e) => startLongPressAny({ msg, mine, kind: "attachment", attachment: a, evt: e })} onMouseUp={cancelLongPress} onMouseLeave={cancelLongPress}>
-                      <AttachmentPreview 
-                        attachment={a} 
-                        onView={() => openAttachmentWithCache(a)} 
-                        isMine={mine}
-                        downloadState={downloadState}
-                        onDownload={handleNativeDownload}
-                      />
-                    </div>
-                  );
-                })}</div>)}
+                {attachments.length > 0 && (
+                  <div className="mt-[4px] space-y-1.5 w-full max-w-full">
+                    {attachments.map((a: any) => {
+                      const fileUrl = a?.url || a?.attachment_url;
+                      const downloadState = nativeDownloads[fileUrl];
+                      return (
+                        <div
+                          key={`att:${safeNum(a?.id) || 0}:${safeStr(fileUrl)}`}
+                          onTouchStart={(e) => startLongPressAny({ msg, mine, kind: "attachment", attachment: a, evt: e })}
+                          onTouchEnd={cancelLongPress}
+                          onTouchMove={cancelLongPress}
+                          onMouseDown={(e) => startLongPressAny({ msg, mine, kind: "attachment", attachment: a, evt: e })}
+                          onMouseUp={cancelLongPress}
+                          onMouseLeave={cancelLongPress}
+                        >
+                          <AttachmentPreview 
+                            attachment={a} 
+                            onView={() => openAttachmentWithCache(a)} 
+                            isMine={mine}
+                            downloadState={downloadState}
+                            onDownload={handleNativeDownload}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -2085,27 +2326,47 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
 
       {/* Attachment menu with native picker support */}
       {showAttachmentMenu && (
-        <div className="border-t border-[#333] bg-[#1e1e1e] p-3">
-          <div className="grid grid-cols-4 gap-3">
+        <div className="border-t border-[#1A1A1A] bg-[#121212] p-3">
+          <div className="grid grid-cols-4 gap-2">
             {/* Photos */}
-            <button onClick={() => { if (callNativePicker('image')) return; if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.multiple = true; fileInputRef.current.click(); } }} className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-[#2d2d2d] transition-colors">
-              <div className="w-12 h-12 rounded-full bg-[#1B74E4]/20 flex items-center justify-center"><i className="fas fa-image text-2xl text-[#1B74E4]" /></div>
-              <span className="text-xs text-[#b0b3b8]">Photos</span>
+            <button
+              onClick={() => { if (callNativePicker('image')) return; if (fileInputRef.current) { fileInputRef.current.accept = "image/*"; fileInputRef.current.multiple = true; fileInputRef.current.click(); } }}
+              className="flex flex-col items-center gap-2 p-2.5 rounded-2xl hover:bg-[#242526] active:scale-95 transition-all"
+            >
+              <div className="w-12 h-12 rounded-full bg-[#0084FF]/15 flex items-center justify-center text-[#0084FF]">
+                <i className="fas fa-image text-xl" />
+              </div>
+              <span className="text-[12px] font-medium text-[#8E8E93]">Photos</span>
             </button>
             {/* Videos */}
-            <button onClick={() => { if (callNativePicker('video')) return; if (fileInputRef.current) { fileInputRef.current.accept = "video/*"; fileInputRef.current.multiple = true; fileInputRef.current.click(); } }} className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-[#2d2d2d] transition-colors">
-              <div className="w-12 h-12 rounded-full bg-[#1B74E4]/20 flex items-center justify-center"><i className="fas fa-video text-2xl text-[#1B74E4]" /></div>
-              <span className="text-xs text-[#b0b3b8]">Videos</span>
+            <button
+              onClick={() => { if (callNativePicker('video')) return; if (fileInputRef.current) { fileInputRef.current.accept = "video/*"; fileInputRef.current.multiple = true; fileInputRef.current.click(); } }}
+              className="flex flex-col items-center gap-2 p-2.5 rounded-2xl hover:bg-[#242526] active:scale-95 transition-all"
+            >
+              <div className="w-12 h-12 rounded-full bg-[#0084FF]/15 flex items-center justify-center text-[#0084FF]">
+                <i className="fas fa-video text-xl" />
+              </div>
+              <span className="text-[12px] font-medium text-[#8E8E93]">Videos</span>
             </button>
             {/* Audio */}
-            <button onClick={() => { if (callNativePicker('audio')) return; if (fileInputRef.current) { fileInputRef.current.accept = "audio/*"; fileInputRef.current.multiple = true; fileInputRef.current.click(); } }} className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-[#2d2d2d] transition-colors">
-              <div className="w-12 h-12 rounded-full bg-[#1B74E4]/20 flex items-center justify-center"><i className="fas fa-music text-2xl text-[#1B74E4]" /></div>
-              <span className="text-xs text-[#b0b3b8]">Audio</span>
+            <button
+              onClick={() => { if (callNativePicker('audio')) return; if (fileInputRef.current) { fileInputRef.current.accept = "audio/*"; fileInputRef.current.multiple = true; fileInputRef.current.click(); } }}
+              className="flex flex-col items-center gap-2 p-2.5 rounded-2xl hover:bg-[#242526] active:scale-95 transition-all"
+            >
+              <div className="w-12 h-12 rounded-full bg-[#0084FF]/15 flex items-center justify-center text-[#0084FF]">
+                <i className="fas fa-music text-xl" />
+              </div>
+              <span className="text-[12px] font-medium text-[#8E8E93]">Audio</span>
             </button>
             {/* Documents */}
-            <button onClick={() => { if (callNativePicker('document')) return; if (fileInputRef.current) { fileInputRef.current.accept = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"; fileInputRef.current.multiple = true; fileInputRef.current.click(); } }} className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-[#2d2d2d] transition-colors">
-              <div className="w-12 h-12 rounded-full bg-[#1B74E4]/20 flex items-center justify-center"><i className="fas fa-file text-2xl text-[#1B74E4]" /></div>
-              <span className="text-xs text-[#b0b3b8]">Documents</span>
+            <button
+              onClick={() => { if (callNativePicker('document')) return; if (fileInputRef.current) { fileInputRef.current.accept = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"; fileInputRef.current.multiple = true; fileInputRef.current.click(); } }}
+              className="flex flex-col items-center gap-2 p-2.5 rounded-2xl hover:bg-[#242526] active:scale-95 transition-all"
+            >
+              <div className="w-12 h-12 rounded-full bg-[#0084FF]/15 flex items-center justify-center text-[#0084FF]">
+                <i className="fas fa-file text-xl" />
+              </div>
+              <span className="text-[12px] font-medium text-[#8E8E93]">Documents</span>
             </button>
           </div>
         </div>
@@ -2113,7 +2374,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
 
       {/* Emoji / Stickers / GIF panel */}
       {(showEmoji || showStickers || showGifs) && (
-        <div className="border-t border-[#333] bg-[#1e1e1e]">
+        <div className="border-t border-[#1A1A1A] bg-[#121212]">
           {showEmoji && (<div className="p-2"><EmojiPicker onSelect={(emoji: string) => { setInputText((p) => (p ? `${p}${emoji}` : emoji)); }} /></div>)}
           {showStickers && (<div className="p-2"><StickerPicker onSelect={(stickerText: string) => { sendText(stickerText); }} /></div>)}
           {showGifs && (<GifPanel onSelect={(gifUrl) => { sendText(gifUrl); }} />)}
@@ -2121,33 +2382,127 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
       )}
 
       {/* Composer */}
-      <form onSubmit={handleSubmit} className="border-t border-[#333] bg-[#1e1e1e] px-2" style={{ paddingBottom: safeAreaPaddingBottom }}>
-        <div className="py-2 flex items-end gap-2">
-          <div className="flex items-center gap-1 shrink-0">
-            <button type="button" className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#2d2d2d] transition-colors" aria-label="Attach" onClick={() => { setShowAttachmentMenu(!showAttachmentMenu); setShowEmoji(false); setShowStickers(false); setShowGifs(false); }}><i className="fas fa-plus text-[18px] text-[#1B74E4]" /></button>
-            <button type="button" className="px-2 h-9 rounded-full flex items-center justify-center hover:bg-[#2d2d2d] transition-colors" aria-label="GIF" onClick={() => { setShowGifs((v) => !v); setShowEmoji(false); setShowStickers(false); setShowAttachmentMenu(false); }}><span className="text-[13px] font-bold text-[#1B74E4]">GIF</span></button>
-            <button type="button" className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#2d2d2d] transition-colors" aria-label="Stickers" onClick={() => { setShowStickers((v) => !v); setShowEmoji(false); setShowAttachmentMenu(false); setShowGifs(false); }}><i className="fas fa-face-smile text-[18px] text-[#1B74E4]" /></button>
+      <form onSubmit={handleSubmit} className="border-t border-[#1A1A1A] bg-[#000000] px-2.5 pt-1.5" style={{ paddingBottom: safeAreaPaddingBottom }}>
+        <div className="py-1 flex items-end gap-1.5">
+          <div className="flex items-center gap-0.5 shrink-0 text-[#0084FF]">
+            <button
+              type="button"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#1A1A1A] active:scale-95 transition-transform"
+              aria-label="Attach"
+              onClick={() => { setShowAttachmentMenu(!showAttachmentMenu); setShowEmoji(false); setShowStickers(false); setShowGifs(false); }}
+            >
+              <i className="fas fa-circle-plus text-[21px]" />
+            </button>
+            <button
+              type="button"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#1A1A1A] active:scale-95 transition-transform"
+              aria-label="Photos"
+              onClick={() => {
+                if (callNativePicker('image')) return;
+                if (fileInputRef.current) {
+                  fileInputRef.current.accept = "image/*,video/*";
+                  fileInputRef.current.multiple = true;
+                  fileInputRef.current.click();
+                }
+              }}
+            >
+              <i className="fas fa-images text-[19px]" />
+            </button>
+            <button
+              type="button"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#1A1A1A] active:scale-95 transition-transform"
+              aria-label="Stickers"
+              onClick={() => { setShowStickers((v) => !v); setShowEmoji(false); setShowAttachmentMenu(false); setShowGifs(false); }}
+            >
+              <i className="fas fa-face-smile text-[19px]" />
+            </button>
+            <button
+              type="button"
+              className="px-1.5 h-9 rounded-full flex items-center justify-center hover:bg-[#1A1A1A] active:scale-95 transition-transform"
+              aria-label="GIF"
+              onClick={() => { setShowGifs((v) => !v); setShowEmoji(false); setShowStickers(false); setShowAttachmentMenu(false); }}
+            >
+              <span className="text-[12px] font-black tracking-tighter bg-[#0084FF]/20 px-1.5 py-0.5 rounded">GIF</span>
+            </button>
           </div>
-          <div className="flex-1 min-w-0 bg-[#2d2d2d] rounded-full px-3 py-2 flex items-center gap-2">
-            <input value={inputText} onChange={(e) => setInputText(e.target.value)} placeholder={editTarget ? "Edit message" : "Message"} className="flex-1 min-w-0 bg-transparent outline-none text-[15px] text-[#e4e6eb] placeholder:text-[#b0b3b8]" disabled={uploading || recording} />
-            <button type="button" className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[#3a3a3a] transition-colors shrink-0" aria-label="Emoji" onClick={() => { setShowEmoji((v) => !v); setShowStickers(false); setShowAttachmentMenu(false); setShowGifs(false); }}><i className="far fa-smile text-[18px] text-[#1B74E4]" /></button>
-            <button type="button" className={`w-8 h-8 rounded-full flex items-center justify-center hover:bg-[#3a3a3a] transition-colors shrink-0 ${recording ? "text-[#ff4d4d]" : ""}`} aria-label="Voice" onClick={() => { if (recording) stopVoiceNote(false); else startVoiceNote(); }} disabled={uploading}><i className={`fas ${recording ? "fa-stop" : "fa-microphone"} text-[18px] text-[#1B74E4]`} /></button>
+
+          <div className="flex-1 min-w-0 bg-[#242526] hover:bg-[#2A2B2D] focus-within:bg-[#2A2B2D] rounded-full px-3.5 py-2 flex items-center gap-2 border border-transparent focus-within:border-[#383A40] transition-colors">
+            <input
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder={editTarget ? "Edit message" : "Aa"}
+              className="flex-1 min-w-0 bg-transparent outline-none text-[15px] text-white placeholder:text-[#8E8E93]"
+              disabled={uploading || recording}
+            />
+            <button
+              type="button"
+              className="w-7 h-7 rounded-full flex items-center justify-center hover:text-white transition-colors shrink-0 text-[#0084FF]"
+              aria-label="Emoji"
+              onClick={() => { setShowEmoji((v) => !v); setShowStickers(false); setShowAttachmentMenu(false); setShowGifs(false); }}
+            >
+              <i className="far fa-smile text-[18px]" />
+            </button>
+            <button
+              type="button"
+              className={`w-7 h-7 rounded-full flex items-center justify-center hover:text-white transition-colors shrink-0 ${recording ? "text-[#ff4d4d]" : "text-[#0084FF]"}`}
+              aria-label="Voice"
+              onClick={() => { if (recording) stopVoiceNote(false); else startVoiceNote(); }}
+              disabled={uploading}
+            >
+              <i className={`fas ${recording ? "fa-stop" : "fa-microphone"} text-[17px]`} />
+            </button>
           </div>
-          {canSend || editTarget ? (<button type="submit" className="w-10 h-10 rounded-full bg-[#1B74E4] flex items-center justify-center hover:bg-[#1A6ED8] transition-colors shrink-0" aria-label="Send" disabled={uploading || recording}><i className="fas fa-paper-plane text-[16px] text-white" /></button>) : (<button type="button" className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[#2d2d2d] transition-colors shrink-0" aria-label="Like" onClick={() => sendText("👍")} disabled={uploading || recording}><i className="fas fa-thumbs-up text-[20px] text-[#1B74E4]" /></button>)}
+
+          {canSend || editTarget ? (
+            <button
+              type="submit"
+              className="w-9 h-9 rounded-full bg-[#0084FF] hover:bg-[#0073E6] flex items-center justify-center text-white active:scale-95 transition-all shrink-0 shadow-md shadow-[#0084FF]/20"
+              aria-label="Send"
+              disabled={uploading || recording}
+            >
+              <i className="fas fa-paper-plane text-[15px]" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="w-9 h-9 rounded-full flex items-center justify-center hover:scale-110 active:scale-90 transition-transform shrink-0 text-[#0084FF]"
+              aria-label="Like"
+              onClick={() => sendText("👍")}
+              disabled={uploading || recording}
+            >
+              <i className="fas fa-thumbs-up text-[21px]" />
+            </button>
+          )}
         </div>
       </form>
 
       {/* Action Modal */}
       {actionModal && (
         <div className="fixed inset-0 z-[300]" onClick={closeActionModal} onTouchStart={closeActionModal} role="presentation">
-          <div className="absolute inset-0 bg-black/50" />
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-full max-w-md bg-[#1e1e1e] border-t border-[#333] rounded-t-2xl p-3" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-[13px] text-[#b0b3b8] truncate pr-2">{actionModal.mine ? "Your message" : "Message"}</div>
-              <button type="button" className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#2d2d2d]" aria-label="Close" onClick={closeActionModal}><i className="fas fa-xmark text-[#e4e6eb]" /></button>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-full max-w-md bg-[#18191A] border-t border-[#262626] rounded-t-3xl p-4 shadow-2xl" onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+            <div className="w-10 h-1 bg-[#3A3B3C] rounded-full mx-auto mb-3" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[13px] font-semibold text-[#8E8E93] truncate pr-2">
+                {actionModal.mine ? "Your message" : "Message"}
+              </div>
+              <button
+                type="button"
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-[#242526] text-[#8E8E93] hover:text-white"
+                aria-label="Close"
+                onClick={closeActionModal}
+              >
+                <i className="fas fa-xmark text-[16px]" />
+              </button>
             </div>
-            <div className="bg-[#141414] border border-[#2b2b2b] rounded-2xl p-3 mb-3">
-              <div className="text-[14px] text-[#e4e6eb] break-words" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>{(() => { if (actionModal.kind === "gif") return "🖼️ GIF"; if (actionModal.kind === "attachment") return "📎 Attachment"; return safeStr(actionModal.msg?.text_content) || "…"; })()}</div>
+            <div className="bg-[#121212] border border-[#262626] rounded-2xl p-3 mb-3">
+              <div className="text-[14px] text-[#F0F2F5] break-words leading-relaxed" style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                {(() => {
+                  if (actionModal.kind === "gif") return "🖼️ GIF";
+                  if (actionModal.kind === "attachment") return "📎 Attachment";
+                  return safeStr(actionModal.msg?.text_content) || "…";
+                })()}
+              </div>
             </div>
             <div className="space-y-1">
               {actionBtn("fas fa-reply", "Reply", () => { const m = actionModal.msg; closeActionModal(); setEditTarget(null); setReplyTo(m); })}
@@ -2161,11 +2516,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
                 closeActionModal(); 
                 if (url) handleNativeDownload(url, name); 
               })}
-              {actionModal.mine && actionModal.kind === "message" ? actionBtn("fas fa-pen", "Edit", () => { const m = actionModal.msg; closeActionModal(); setReplyTo(null); setEditTarget(m); setInputText(safeStr(m?.text_content) || ""); setTimeout(() => { const el = document.querySelector<HTMLInputElement>('input[placeholder="Edit message"], input[placeholder="Message"]'); el?.focus?.(); }, 50); }) : null}
+              {actionModal.mine && actionModal.kind === "message" ? actionBtn("fas fa-pen", "Edit", () => { const m = actionModal.msg; closeActionModal(); setReplyTo(null); setEditTarget(m); setInputText(safeStr(m?.text_content) || ""); setTimeout(() => { const el = document.querySelector<HTMLInputElement>('input[placeholder="Edit message"], input[placeholder="Aa"]'); el?.focus?.(); }, 50); }) : null}
               {actionBtn("fas fa-trash", "Delete", async () => { const m = actionModal.msg; closeActionModal(); await doDelete(m, false); }, true)}
               {actionModal.mine ? actionBtn("fas fa-trash-can", "Delete for everyone", async () => { const m = actionModal.msg; closeActionModal(); await doDelete(m, true); }, true) : null}
             </div>
-            <div className="mt-3"><button type="button" onClick={closeActionModal} className="w-full py-3 rounded-xl bg-[#2d2d2d] text-[#e4e6eb] font-semibold hover:bg-[#333]">Cancel</button></div>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={closeActionModal}
+                className="w-full py-3 rounded-2xl bg-[#242526] text-white font-semibold hover:bg-[#2D3035] active:scale-[0.98] transition-all"
+              >
+                Cancel
+              </button>
+            </div>
             <div style={{ height: "max(env(safe-area-inset-bottom), 8px)" }} />
           </div>
         </div>
@@ -2173,7 +2536,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
 
       {/* Attachment Viewer Modal with cached URL support */}
       {viewingAttachment && (
-        <div className="fixed inset-0 z-[400] bg-black/90 flex items-center justify-center p-4" onClick={() => setViewingAttachment(null)}>
+        <div className="fixed inset-0 z-[400] bg-black/95 flex items-center justify-center p-4" onClick={() => setViewingAttachment(null)}>
           <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center">
             <button onClick={() => setViewingAttachment(null)} className="absolute top-4 right-4 z-10 w-10 h-10 bg-black/60 rounded-full flex items-center justify-center hover:bg-black/80"><i className="fas fa-times text-white text-xl" /></button>
             {(() => { 
@@ -2190,32 +2553,32 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ currentUser, recipient, 
               if (isImg) return <img src={url} alt={name} className="max-w-full max-h-[90vh] object-contain" />; 
               if (isVid) return <video src={url} controls autoPlay className="max-w-full max-h-[90vh]"><source src={url} type={mime} />Your browser does not support the video tag.</video>; 
               if (isAud) return (
-                <div className="bg-[#242526] rounded-xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+                <div className="bg-[#18191A] border border-[#262626] rounded-2xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
                   <div className="flex flex-col gap-4">
                     <div className="flex items-center gap-3">
-                      <i className="fas fa-microphone text-3xl text-[#1B74E4]" />
+                      <i className="fas fa-microphone text-3xl text-[#0084FF]" />
                       <div className="min-w-0">
                         <div className="text-white font-semibold truncate">{name}</div>
-                        {size ? <div className="text-[#b0b3b8] text-sm">{formatFileSize(size)}</div> : null}
+                        {size ? <div className="text-[#8E8E93] text-sm">{formatFileSize(size)}</div> : null}
                       </div>
                     </div>
                     <VoiceNoteWA src={url} isMine={false} />
-                    <button type="button" onClick={() => handleNativeDownload(originalUrl, name)} className="bg-[#1B74E4] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#1A6ED8] text-center">Download</button>
+                    <button type="button" onClick={() => handleNativeDownload(originalUrl, name)} className="bg-[#0084FF] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#0073E6] text-center transition-colors">Download</button>
                   </div>
                 </div>
               ); 
               return (
-                <div className="bg-[#242526] rounded-xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+                <div className="bg-[#18191A] border border-[#262626] rounded-2xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
                   <div className="flex flex-col gap-4">
                     <div className="flex items-center gap-3">
-                      <i className={`${getFileIcon(mime)} text-3xl text-[#1B74E4]`} />
+                      <i className={`${getFileIcon(mime)} text-3xl text-[#0084FF]`} />
                       <div className="min-w-0">
                         <div className="text-white font-semibold truncate">{name}</div>
-                        {size ? <div className="text-[#b0b3b8] text-sm">{formatFileSize(size)}</div> : null}
+                        {size ? <div className="text-[#8E8E93] text-sm">{formatFileSize(size)}</div> : null}
                       </div>
                     </div>
                     {mime.startsWith("text/") || mime === "application/pdf" ? <iframe src={url} className="w-full h-[60vh] rounded-lg" title={name} /> : null}
-                    <button type="button" onClick={() => handleNativeDownload(originalUrl, name)} className="bg-[#1B74E4] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#1A6ED8] text-center">Download</button>
+                    <button type="button" onClick={() => handleNativeDownload(originalUrl, name)} className="bg-[#0084FF] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#0073E6] text-center transition-colors">Download</button>
                   </div>
                 </div>
               ); 

@@ -8,6 +8,69 @@ const safeNum = (v: any, fb = 0) => {
   return Number.isFinite(n) ? n : fb;
 };
 
+/* ============================================================
+   ✅ CACHING HELPERS FOR CONVERSATIONS & CONTACTS
+   Survives component unmounts and page navigation so messages
+   never have to reload or display a loading spinner every time.
+============================================================ */
+const CONVOS_CACHE_PREFIX = "unera_cached_convos_v2_";
+const FOLLOWING_CACHE_PREFIX = "unera_cached_following_v2_";
+
+const inMemConvos: Record<number, ConversationRow[]> = {};
+const inMemFollowing: Record<number, User[]> = {};
+
+export const getCachedConversations = (userId: number): ConversationRow[] => {
+  if (!userId) return [];
+  if (inMemConvos[userId] && inMemConvos[userId].length > 0) {
+    return inMemConvos[userId];
+  }
+  try {
+    const raw = localStorage.getItem(`${CONVOS_CACHE_PREFIX}${userId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        inMemConvos[userId] = parsed;
+        return parsed;
+      }
+    }
+  } catch {}
+  return [];
+};
+
+export const setCachedConversations = (userId: number, rows: ConversationRow[]) => {
+  if (!userId) return;
+  inMemConvos[userId] = rows;
+  try {
+    localStorage.setItem(`${CONVOS_CACHE_PREFIX}${userId}`, JSON.stringify(rows));
+  } catch {}
+};
+
+export const getCachedFollowing = (userId: number): User[] => {
+  if (!userId) return [];
+  if (inMemFollowing[userId] && inMemFollowing[userId].length > 0) {
+    return inMemFollowing[userId];
+  }
+  try {
+    const raw = localStorage.getItem(`${FOLLOWING_CACHE_PREFIX}${userId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        inMemFollowing[userId] = parsed;
+        return parsed;
+      }
+    }
+  } catch {}
+  return [];
+};
+
+export const setCachedFollowing = (userId: number, users: User[]) => {
+  if (!userId) return;
+  inMemFollowing[userId] = users;
+  try {
+    localStorage.setItem(`${FOLLOWING_CACHE_PREFIX}${userId}`, JSON.stringify(users));
+  } catch {}
+};
+
 const apiFetch = async (url: string, options: RequestInit = {}, userId?: number) => {
   const token = localStorage.getItem("unera_token");
   const headers: HeadersInit = {
@@ -44,7 +107,7 @@ const formatRelative = (v: any) => {
   const now = Date.now();
   const diff = Math.max(0, now - d.getTime());
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "now";
+  if (mins < 1) return "Just now";
   if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h`;
@@ -53,7 +116,13 @@ const formatRelative = (v: any) => {
   return d.toLocaleDateString(undefined, { month: "short", day: "2-digit" });
 };
 
-const Avatar: React.FC<{ src?: string | null; name?: string; size?: number }> = ({ src, name = "", size = 52 }) => {
+const Avatar: React.FC<{ src?: string | null; name?: string; size?: number; hasActiveIndicator?: boolean; isOnline?: boolean }> = ({
+  src,
+  name = "",
+  size = 52,
+  hasActiveIndicator = false,
+  isOnline = false,
+}) => {
   const url = safeStr(src);
   const initials =
     (safeStr(name)
@@ -63,45 +132,52 @@ const Avatar: React.FC<{ src?: string | null; name?: string; size?: number }> = 
       .map((p) => p[0]?.toUpperCase())
       .join("") || "U").slice(0, 2);
 
-  if (url) {
-    return (
-      <img
-        src={url}
-        alt={name}
-        className="rounded-full object-cover border border-[#3E4042]"
-        style={{ width: size, height: size }}
-        onError={(e) => {
-          const img = e.currentTarget;
-          img.onerror = null;
-          img.src =
-            "data:image/svg+xml;charset=utf-8," +
-            encodeURIComponent(
-              `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
-                <rect width="100%" height="100%" fill="#3A3B3C"/>
-                <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="${Math.max(
-                  14,
-                  Math.floor(size * 0.36)
-                )}" font-family="Arial" fill="#E4E6EB">${initials}</text>
-              </svg>`
-            );
-        }}
-      />
-    );
-  }
-
   return (
-    <div
-      className="rounded-full bg-[#3A3B3C] flex items-center justify-center text-[#E4E6EB] font-semibold border border-[#4E4F50]"
-      style={{ width: size, height: size, fontSize: Math.max(14, Math.floor(size * 0.36)) }}
-      aria-label={name}
-      title={name}
-    >
-      {initials}
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      {url ? (
+        <img
+          src={url}
+          alt={name}
+          className="rounded-full object-cover border border-[#262626] bg-[#1C1E21]"
+          style={{ width: size, height: size }}
+          onError={(e) => {
+            const img = e.currentTarget;
+            img.onerror = null;
+            img.src =
+              "data:image/svg+xml;charset=utf-8," +
+              encodeURIComponent(
+                `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
+                  <rect width="100%" height="100%" fill="#242526"/>
+                  <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="${Math.max(
+                    14,
+                    Math.floor(size * 0.36)
+                  )}" font-family="Arial" fill="#E4E6EB">${initials}</text>
+                </svg>`
+              );
+          }}
+        />
+      ) : (
+        <div
+          className="rounded-full bg-[#242526] flex items-center justify-center text-[#FFFFFF] font-bold border border-[#2D3035]"
+          style={{ width: size, height: size, fontSize: Math.max(14, Math.floor(size * 0.36)) }}
+          aria-label={name}
+          title={name}
+        >
+          {initials}
+        </div>
+      )}
+
+      {hasActiveIndicator && isOnline && (
+        <span
+          className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-[#31A24C] rounded-full ring-2 ring-black"
+          title="Active now"
+        />
+      )}
     </div>
   );
 };
 
-type ConversationRow = {
+export type ConversationRow = {
   id: number;
   other_user_id: number;
   other_name: string;
@@ -109,9 +185,10 @@ type ConversationRow = {
   last_text_preview: string;
   last_message_at: string | null;
   unread_count: number;
+  is_online?: boolean;
 };
 
-type ChatsListProps = {
+export type ChatsListProps = {
   currentUser: User;
   onOpenChat: (recipient: User) => void;
   onClose?: () => void;
@@ -134,43 +211,45 @@ const scrollbarHideStyles = `
   }
 `;
 
-if (typeof document !== 'undefined') {
-  const styleId = 'chatslist-scrollbar-styles';
+if (typeof document !== "undefined") {
+  const styleId = "chatslist-scrollbar-styles";
   if (!document.getElementById(styleId)) {
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.id = styleId;
     style.textContent = scrollbarHideStyles;
     document.head.appendChild(style);
   }
 }
 
-export const ChatsList: React.FC<ChatsListProps> = ({ 
-  currentUser, 
-  onOpenChat, 
-  onClose, 
-  onOpenRequests, 
+export const ChatsList: React.FC<ChatsListProps> = ({
+  currentUser,
+  onOpenChat,
+  onClose,
+  onOpenRequests,
   onNewChat,
-  onOpenHome,
-  onOpenMarketplace,
-  feedNotificationCount = 0,
-  messageNotificationCount = 0
 }) => {
-  const [rows, setRows] = useState<ConversationRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [errorText, setErrorText] = useState<string>("");
-  const [following, setFollowing] = useState<User[]>([]);
-  
-  // New message modal state
-  const [showNewMessage, setShowNewMessage] = useState(false);
-  const [newMessageQuery, setNewMessageQuery] = useState('');
-
   const currentUserId = safeNum((currentUser as any)?.id, 0);
 
-  const fetchConversations = useCallback(async () => {
+  // Initialize immediately from cached conversations to eliminate any blank loading state
+  const [rows, setRows] = useState<ConversationRow[]>(() => getCachedConversations(currentUserId));
+  const [following, setFollowing] = useState<User[]>(() => getCachedFollowing(currentUserId));
+  const [loading, setLoading] = useState<boolean>(() => rows.length === 0);
+  const [errorText, setErrorText] = useState<string>("");
+
+  // In-app search for Facebook Messenger chats list
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // New message modal state
+  const [showNewMessage, setShowNewMessage] = useState(false);
+  const [newMessageQuery, setNewMessageQuery] = useState("");
+
+  const fetchConversations = useCallback(async (isInitial = false) => {
     if (!currentUserId) return;
     try {
       setErrorText("");
-      setLoading(true);
+      if (isInitial && rows.length === 0) {
+        setLoading(true);
+      }
 
       const data = await apiFetch("/api/messages/conversations", {}, currentUserId);
 
@@ -181,8 +260,9 @@ export const ChatsList: React.FC<ChatsListProps> = ({
             other_name: safeStr(c?.other_name || "User"),
             other_profile_image_url: safeStr(c?.other_profile_image_url) || null,
             last_text_preview: safeStr(c?.last_text_preview || ""),
-            last_message_at: safeStr(c?.last_message_at || c?.last_message_at || null),
+            last_message_at: safeStr(c?.last_message_at || null),
             unread_count: safeNum(c?.unread_count, 0),
+            is_online: safeNum(c?.is_online, 0) === 1,
           }))
         : [];
 
@@ -193,14 +273,16 @@ export const ChatsList: React.FC<ChatsListProps> = ({
       });
 
       setRows(arr);
+      setCachedConversations(currentUserId, arr);
     } catch (e: any) {
       console.error("ChatsList fetchConversations error:", e?.message || e);
-      setErrorText(e?.message || "Failed to load conversations");
-      setRows([]);
+      if (rows.length === 0) {
+        setErrorText(e?.message || "Failed to load conversations");
+      }
     } finally {
       setLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, rows.length]);
 
   const fetchFollowing = useCallback(async () => {
     if (!currentUserId) return;
@@ -217,25 +299,41 @@ export const ChatsList: React.FC<ChatsListProps> = ({
           }))
         : [];
       setFollowing(users);
+      setCachedFollowing(currentUserId, users);
     } catch (e) {
       console.error("Failed to fetch following:", e);
     }
   }, [currentUserId]);
 
   useEffect(() => {
-    fetchConversations();
+    fetchConversations(true);
     fetchFollowing();
-    const t = window.setInterval(fetchConversations, 5000);
+
+    // Background silent revalidation every 7 seconds
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchConversations(false);
+      }
+    }, 7000);
+
     return () => window.clearInterval(t);
   }, [fetchConversations, fetchFollowing]);
 
-  const totalUnread = useMemo(() => rows.reduce((sum, r) => sum + safeNum(r.unread_count, 0), 0), [rows]);
+  // Filter conversations by search query
+  const filteredRows = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      r.other_name.toLowerCase().includes(q) ||
+      r.last_text_preview.toLowerCase().includes(q)
+    );
+  }, [rows, searchQuery]);
 
-  // Filtered following for search
+  // Filtered following for new message search
   const filteredFollowing = useMemo(() => {
     const q = safeStr(newMessageQuery).trim().toLowerCase();
     if (!q) return following;
-    return following.filter((u: any) => 
+    return following.filter((u: any) =>
       safeStr(u?.name).toLowerCase().includes(q)
     );
   }, [following, newMessageQuery]);
@@ -252,223 +350,323 @@ export const ChatsList: React.FC<ChatsListProps> = ({
   };
 
   return (
-    // 🔥 FIX 1: Back to fixed inset-0 overlay mode
-    <div className="fixed inset-0 z-[150] bg-[#18191A] font-sans flex flex-col pb-[env(safe-area-inset-bottom,0px)]">
-      
-      {/* 🔥 FIX 2: Removed min-h-0, kept flex-1 */}
-      <div className="bg-[#242526] flex-1 flex flex-col overflow-hidden">
-        
-        {/* Sticky header with edge-to-edge status bar padding */}
-        <div className="sticky top-0 z-20 px-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-2 flex items-center border-b border-[#3E4042] bg-[#242526]">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#3A3B3C] transition-colors"
-              onClick={() => {
-                if (onClose) onClose();
-              }}
-              aria-label="Back"
-            >
-              <i className="fas fa-arrow-left text-[18px] text-[#E4E6EB]" />
-            </button>
-            <div className="text-[28px] font-extrabold text-[#E4E6EB] leading-none">Chats</div>
+    <div className="fixed inset-0 z-[150] bg-[#000000] text-white font-sans flex flex-col select-none overflow-hidden pb-[env(safe-area-inset-bottom,0px)]">
+      {/* Top Messenger Status & Header Bar */}
+      <div className="shrink-0 bg-[#000000] border-b border-[#1A1A1A] px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-2.5 flex items-center justify-between">
+        {/* Left: Back Arrow + Chats Title */}
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-[#1A1A1A] hover:bg-[#262626] active:scale-95 text-white transition-all shrink-0"
+            onClick={() => {
+              if (onClose) onClose();
+            }}
+            aria-label="Back"
+          >
+            <i className="fas fa-arrow-left text-[16px]" />
+          </button>
+
+          <div className="flex items-center gap-2.5 min-w-0">
+            <h1 className="text-[26px] font-black tracking-tight text-white leading-none">
+              Chats
+            </h1>
           </div>
         </div>
 
-        {/* Top horizontal users (Facebook style) */}
-        <div className="px-3 py-3 border-b border-[#3E4042] bg-[#242526]">
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide">
-            {/* Your note (self) */}
-            <div className="flex flex-col items-center min-w-[60px]">
+        {/* Right: Compose Button (Facebook Messenger pen icon) */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowNewMessage(true)}
+            className="w-9 h-9 rounded-full bg-[#1C1E21] hover:bg-[#2E3136] active:scale-95 text-white flex items-center justify-center transition-all shadow-sm"
+            aria-label="New message"
+            title="New message"
+          >
+            <i className="fas fa-pen-to-square text-[15px]" />
+          </button>
+        </div>
+      </div>
+
+      {/* Facebook Messenger Search Bar */}
+      <div className="shrink-0 px-4 py-2.5 bg-[#000000]">
+        <div className="relative flex items-center bg-[#1C1E21] hover:bg-[#242526] focus-within:bg-[#242526] border border-transparent focus-within:border-[#383A40] rounded-full px-3.5 py-2 transition-all">
+          <i className="fas fa-magnifying-glass text-[#8E8E93] text-[15px] mr-2.5 shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search"
+            className="w-full bg-transparent text-[15px] text-white placeholder-[#8E8E93] outline-none"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="text-[#8E8E93] hover:text-white ml-2 shrink-0"
+              aria-label="Clear search"
+            >
+              <i className="fas fa-circle-xmark text-[14px]" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Facebook Messenger "Active Now" horizontal tray */}
+      {following.length > 0 && !searchQuery && (
+        <div className="shrink-0 px-4 py-2 border-b border-[#141414] bg-[#000000]">
+          <div className="flex items-center gap-3.5 overflow-x-auto scrollbar-hide py-1">
+            {/* User's own card with note prompt */}
+            <div className="flex flex-col items-center min-w-[58px] shrink-0 cursor-pointer group">
               <div className="relative">
-                <Avatar 
-                  src={currentUser.profile_image_url} 
-                  name={currentUser.name} 
-                  size={52} 
+                <Avatar
+                  src={currentUser.profile_image_url}
+                  name={currentUser.name}
+                  size={52}
+                  hasActiveIndicator={true}
+                  isOnline={true}
                 />
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-[#31A24C] rounded-full border-2 border-[#242526]" />
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#0084FF] text-white rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-black">
+                  +
+                </span>
               </div>
-              <span className="text-[12px] text-[#E4E6EB] mt-1 truncate w-[60px] text-center">
-                You
+              <span className="text-[12px] text-[#A0A0A5] group-hover:text-white mt-1.5 truncate w-[58px] text-center font-medium">
+                Your note
               </span>
             </div>
 
-            {/* Following users */}
+            {/* Active followed users */}
             {following.map((u) => (
-              <div 
-                key={u.id} 
-                onClick={() => onOpenChat(u)} 
-                className="flex flex-col items-center min-w-[60px] cursor-pointer hover:opacity-80 transition-opacity"
+              <div
+                key={u.id}
+                onClick={() => onOpenChat(u)}
+                className="flex flex-col items-center min-w-[58px] shrink-0 cursor-pointer group hover:opacity-90 transition-opacity"
               >
                 <div className="relative">
-                  <Avatar 
-                    src={u.profile_image_url} 
-                    name={u.name} 
-                    size={52} 
+                  <Avatar
+                    src={u.profile_image_url}
+                    name={u.name}
+                    size={52}
+                    hasActiveIndicator={true}
+                    isOnline={(u as any).is_online ?? true}
                   />
-                  {(u as any).is_online && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-[#31A24C] rounded-full border-2 border-[#242526]" />
-                  )}
                 </div>
-                <span className="text-[12px] text-[#E4E6EB] mt-1 truncate w-[60px] text-center">
-                  {u.name.split(' ')[0]}
+                <span className="text-[12px] text-[#A0A0A5] group-hover:text-white mt-1.5 truncate w-[58px] text-center font-medium">
+                  {safeStr(u.name).split(" ")[0]}
                 </span>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Message Requests section */}
-        {onOpenRequests && (
-          <div 
-            className="mx-3 my-2 p-3 bg-[#3A3B3C] rounded-xl flex items-center justify-between cursor-pointer hover:bg-[#4E4F50] transition-colors"
-            onClick={onOpenRequests}
-          >
-            <div className="flex items-center gap-2">
-              <i className="fas fa-user-clock text-[#E4E6EB]" />
-              <span className="text-[#E4E6EB] font-semibold">Message requests</span>
-            </div>
-            <span className="text-[#1877F2] font-bold text-sm">9+</span>
-          </div>
-        )}
-
-        {/* Scrollable conversation area */}
-        <div className="flex-1 overflow-y-auto bg-[#242526]">
-          {errorText ? (
-            <div className="px-3 py-3 text-[#ff6b6b] text-sm border-b border-[#3E4042]">
-              {errorText}
-            </div>
-          ) : null}
-
-          {loading && rows.length === 0 ? (
-            <div className="text-center text-[#B0B3B8] text-sm py-8">
-              <i className="fas fa-spinner fa-spin text-2xl mb-2" />
-              <p>Loading conversations...</p>
-            </div>
-          ) : null}
-
-          {rows.map((r) => {
-            const unread = safeNum(r.unread_count, 0);
-            const name = r.other_name || "User";
-            const preview = r.last_text_preview || "No messages yet";
-            const time = r.last_message_at ? formatRelative(r.last_message_at) : "";
-
-            return (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => openRow(r)}
-                className="w-full px-3 py-3 flex items-center gap-3 hover:bg-[#3A3B3C] transition-colors"
-              >
-                <Avatar src={r.other_profile_image_url} name={name} size={52} />
-
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className={`text-[16px] truncate ${unread > 0 ? "font-extrabold text-[#E4E6EB]" : "font-semibold text-[#E4E6EB]"}`}>
-                      {name}
-                    </div>
-                    <div className={`text-[13px] ${unread > 0 ? "text-[#1877F2] font-bold" : "text-[#B0B3B8]"}`}>{time}</div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <div className={`text-[14px] truncate ${unread > 0 ? "text-[#E4E6EB] font-semibold" : "text-[#B0B3B8]"}`}>
-                      {preview}
-                    </div>
-
-                    {unread > 0 ? (
-                      <div className="w-6 h-6 rounded-full bg-[#1877F2] flex items-center justify-center border border-[#242526]">
-                        <span className="text-white text-[12px] font-extrabold">{unread > 9 ? "9+" : unread}</span>
-                      </div>
-                    ) : (
-                      <div className="w-6 h-6" />
-                    )}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-
-          {!loading && rows.length === 0 && !errorText ? (
-            <div className="text-center text-[#B0B3B8] text-sm py-10">
-              <i className="fas fa-comment-slash text-3xl mb-2 opacity-50" />
-              <p>No conversations yet</p>
-              <p className="text-xs mt-1">Start chatting with someone!</p>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {/* 🔥 FIX 3: Fixed plus button with higher z-index */}
-      {onNewChat !== undefined && (
-        <button
-          onClick={() => setShowNewMessage(true)}
-          className="fixed bottom-6 right-6 z-[160] w-14 h-14 rounded-full bg-[#1877F2] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all duration-200 hover:bg-[#166FE5]"
-          aria-label="New chat"
-        >
-          <i className="fas fa-plus text-xl" />
-        </button>
       )}
 
-      {/* 🔥 FIX 4: Fixed New Message modal with higher z-index */}
+      {/* Message Requests Banner (if supported) */}
+      {onOpenRequests && (
+        <div
+          onClick={onOpenRequests}
+          className="mx-3 mt-2 px-3.5 py-2.5 bg-[#141414] hover:bg-[#1C1E21] rounded-xl flex items-center justify-between cursor-pointer border border-[#222222] transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#1C1E21] flex items-center justify-center text-[#0084FF]">
+              <i className="fas fa-user-clock text-sm" />
+            </div>
+            <span className="text-white text-[14px] font-semibold">Message requests</span>
+          </div>
+          <span className="text-[#0084FF] font-extrabold text-xs px-2 py-0.5 bg-[#0084FF]/10 rounded-full">
+            Requests
+          </span>
+        </div>
+      )}
+
+      {/* Scrollable Conversation List */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden bg-[#000000] px-2 py-1">
+        {errorText && rows.length === 0 ? (
+          <div className="px-4 py-3 mx-2 my-2 bg-[#2D1616] text-[#FF7B7B] rounded-xl text-sm border border-[#522222]">
+            <i className="fas fa-triangle-exclamation mr-2" />
+            {errorText}
+          </div>
+        ) : null}
+
+        {loading && rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-[#8E8E93]">
+            <div className="w-8 h-8 border-2 border-[#0084FF] border-t-transparent rounded-full animate-spin mb-3" />
+            <p className="text-sm">Loading chats…</p>
+          </div>
+        ) : null}
+
+        {/* Conversation Rows */}
+        {filteredRows.map((r) => {
+          const unread = safeNum(r.unread_count, 0);
+          const name = r.other_name || "User";
+          const preview = r.last_text_preview || "No messages yet";
+          const time = r.last_message_at ? formatRelative(r.last_message_at) : "";
+
+          return (
+            <div
+              key={r.id}
+              onClick={() => openRow(r)}
+              className="w-full px-2.5 py-2.5 my-0.5 rounded-2xl flex items-center gap-3.5 hover:bg-[#141517] active:bg-[#1C1E21] transition-all cursor-pointer group"
+            >
+              <Avatar
+                src={r.other_profile_image_url}
+                name={name}
+                size={54}
+                hasActiveIndicator={true}
+                isOnline={r.is_online}
+              />
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className={`text-[15px] sm:text-[16px] truncate leading-tight ${
+                      unread > 0 ? "font-black text-white" : "font-semibold text-[#F5F5F7]"
+                    }`}
+                  >
+                    {name}
+                  </span>
+                  <span
+                    className={`text-[12px] whitespace-nowrap shrink-0 ${
+                      unread > 0 ? "text-[#0084FF] font-bold" : "text-[#737373]"
+                    }`}
+                  >
+                    {time}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 mt-1">
+                  <p
+                    className={`text-[13.5px] sm:text-[14px] truncate leading-snug ${
+                      unread > 0 ? "text-white font-semibold" : "text-[#8E8E93] font-normal"
+                    }`}
+                  >
+                    {preview}
+                  </p>
+
+                  {unread > 0 && (
+                    <div className="w-3 h-3 rounded-full bg-[#0084FF] shrink-0 shadow-sm shadow-[#0084FF]/50" />
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Empty state */}
+        {!loading && filteredRows.length === 0 && !errorText && (
+          <div className="text-center text-[#8E8E93] text-sm py-16 px-4">
+            <div className="w-16 h-16 rounded-full bg-[#141414] border border-[#222222] flex items-center justify-center mx-auto mb-3 text-[#0084FF]">
+              <i className="fas fa-comment-dots text-2xl" />
+            </div>
+            <p className="text-base font-semibold text-white">
+              {searchQuery ? "No results found" : "No messages yet"}
+            </p>
+            <p className="text-xs text-[#8E8E93] mt-1 max-w-xs mx-auto">
+              {searchQuery
+                ? `No conversations match "${searchQuery}". Tap below to start a new chat.`
+                : "Connect with friends to start chatting on Messenger."}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowNewMessage(true)}
+              className="mt-4 px-5 py-2 rounded-full bg-[#0084FF] hover:bg-[#0073E6] active:scale-95 text-white text-sm font-bold transition-all shadow-md"
+            >
+              Start a chat
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Floating Messenger Compose Button */}
+      <button
+        onClick={() => setShowNewMessage(true)}
+        className="fixed bottom-6 right-5 z-[160] w-14 h-14 rounded-full bg-[#0084FF] text-white flex items-center justify-center shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all duration-200 hover:bg-[#0073E6]"
+        aria-label="New chat"
+      >
+        <i className="fas fa-plus text-xl" />
+      </button>
+
+      {/* Messenger "New Message" Fullscreen / Modal Sheet */}
       {showNewMessage && (
-        <div className="fixed inset-0 z-[170] bg-[#242526] flex flex-col">
-          {/* Sticky header with search */}
-          <div className="sticky top-0 z-10 bg-[#242526] border-b border-[#3E4042] px-3 py-3">
+        <div className="fixed inset-0 z-[170] bg-[#000000] text-white flex flex-col font-sans">
+          {/* Header */}
+          <div className="sticky top-0 z-10 bg-[#000000] border-b border-[#1A1A1A] px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] pb-3">
             <div className="flex items-center gap-3 mb-3">
               <button
                 type="button"
-                className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-[#3A3B3C] transition-colors"
+                className="w-9 h-9 rounded-full flex items-center justify-center bg-[#1A1A1A] hover:bg-[#262626] active:scale-95 text-white transition-all shrink-0"
                 onClick={() => {
                   setShowNewMessage(false);
-                  setNewMessageQuery('');
+                  setNewMessageQuery("");
                 }}
                 aria-label="Back"
               >
-                <i className="fas fa-arrow-left text-[18px] text-[#E4E6EB]" />
+                <i className="fas fa-arrow-left text-[16px]" />
               </button>
-              <div className="text-[22px] font-extrabold text-[#E4E6EB] leading-none">
+              <h2 className="text-[20px] font-black text-white leading-none">
                 New message
-              </div>
+              </h2>
             </div>
-            
+
             {/* Search input */}
-            <div className="relative">
-              <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#B0B3B8]"></i>
+            <div className="relative flex items-center bg-[#1C1E21] rounded-full px-3.5 py-2 border border-transparent focus-within:border-[#383A40]">
+              <span className="text-[#8E8E93] text-sm mr-2 font-medium">To:</span>
               <input
                 type="text"
                 value={newMessageQuery}
                 onChange={(e) => setNewMessageQuery(e.target.value)}
-                placeholder="Type a name"
-                className="w-full bg-[#3A3B3C] border border-[#3E4042] rounded-full py-3 pl-11 pr-4 text-[#E4E6EB] outline-none focus:border-[#1877F2]"
+                placeholder="Type a name or friend"
+                autoFocus
+                className="w-full bg-transparent text-[15px] text-white placeholder-[#8E8E93] outline-none"
               />
+              {newMessageQuery && (
+                <button
+                  type="button"
+                  onClick={() => setNewMessageQuery("")}
+                  className="text-[#8E8E93] hover:text-white ml-2"
+                >
+                  <i className="fas fa-circle-xmark text-sm" />
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Scrollable user list */}
-          <div className="flex-1 overflow-y-auto">
+          {/* User List */}
+          <div className="flex-1 overflow-y-auto px-2 py-2">
+            <div className="px-3 py-1.5 text-[12px] font-bold uppercase tracking-wider text-[#8E8E93]">
+              Suggested
+            </div>
+
             {filteredFollowing.map((u: any) => (
-              <button
+              <div
                 key={u.id}
-                type="button"
                 onClick={() => {
                   setShowNewMessage(false);
-                  setNewMessageQuery('');
+                  setNewMessageQuery("");
                   onOpenChat(u);
                 }}
-                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#3A3B3C] transition-colors text-left"
+                className="w-full px-3 py-2.5 rounded-xl flex items-center gap-3.5 hover:bg-[#141517] active:bg-[#1C1E21] cursor-pointer transition-colors"
               >
-                <Avatar src={u.profile_image_url} name={u.name} size={52} />
+                <Avatar
+                  src={u.profile_image_url}
+                  name={u.name}
+                  size={48}
+                  hasActiveIndicator={true}
+                  isOnline={(u as any).is_online ?? false}
+                />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[#E4E6EB] font-semibold text-[17px] truncate">
+                  <div className="text-white font-semibold text-[15px] truncate">
                     {u.name}
                   </div>
+                  <div className="text-[12px] text-[#8E8E93] truncate">
+                    {(u as any).is_online ? "Active now" : "Messenger contact"}
+                  </div>
                 </div>
-              </button>
+              </div>
             ))}
-            
+
             {filteredFollowing.length === 0 && (
-              <div className="text-center text-[#B0B3B8] text-sm py-10">
-                No people found
+              <div className="text-center text-[#8E8E93] text-sm py-16">
+                <i className="fas fa-user-xmark text-2xl mb-2 opacity-50" />
+                <p>No contacts found matching &ldquo;{newMessageQuery}&rdquo;</p>
               </div>
             )}
           </div>
@@ -477,3 +675,5 @@ export const ChatsList: React.FC<ChatsListProps> = ({
     </div>
   );
 };
+
+export default ChatsList;
